@@ -14,6 +14,7 @@ OMNI is an AI-powered UX testing prototype that evaluates interface screenshots 
 ```text
 OMNI/
 ├── agents/          # Persona evaluation agent
+├── OMNI-TestLab/    # Test storefront app (Git submodule)
 ├── personas/        # User persona definitions
 ├── results/         # Generated evaluation reports
 ├── screenshots/     # Interface screenshots to evaluate
@@ -26,8 +27,14 @@ OMNI/
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/umar967/OMNI.git
+   git clone --recurse-submodules https://github.com/umar967/OMNI.git
    cd OMNI
+   ```
+
+   If you have already cloned without `--recurse-submodules`, initialise the submodule manually:
+
+   ```bash
+   git submodule update --init --recursive
    ```
 
 2. Create and activate a virtual environment:
@@ -81,6 +88,40 @@ Each finding includes:
 - An explanation of its impact on the persona
 - Visible evidence from the screenshot
 - A practical recommendation
+
+## OMNI-TestLab (submodule)
+
+[OMNI-TestLab](https://github.com/umar967/OMNI-TestLab) is a purpose-built React + Vite storefront that serves as the **evaluation target** for OMNI. It ships with 15 deliberately planted usability issues (documented in its own `UX_ISSUES.md`) so you can benchmark OMNI's persona-based analysis against known ground truth.
+
+### Why it's included
+
+OMNI analyses screenshots of real interfaces. OMNI-TestLab provides a reproducible, self-contained web app you can capture screenshots from, removing the need for an external test site. The typical workflow is:
+
+1. Start the TestLab storefront.
+2. Capture screenshots of the pages or flows you want to evaluate.
+3. Place those screenshots in `screenshots/`.
+4. Run `python main.py` to generate persona-based UX reports.
+
+### Running OMNI-TestLab
+
+From the repository root:
+
+```bash
+cd OMNI-TestLab
+npm install
+npm run dev
+```
+
+The dev server starts at **http://127.0.0.1:5173**. See [`OMNI-TestLab/README.md`](OMNI-TestLab/README.md) for demo credentials, available pages, build/preview commands, and evaluation reset instructions.
+
+### Keeping the submodule up to date
+
+```bash
+git submodule update --remote OMNI-TestLab
+git add OMNI-TestLab
+git commit -m "Update OMNI-TestLab to latest"
+git push
+```
 
 ## Security
 
