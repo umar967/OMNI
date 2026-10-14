@@ -1,0 +1,12 @@
+{
+  "name": "First-Time User",
+  "technical_level": "low",
+  "goal": "Create an account without assistance",
+  "criteria": [
+    "Clarity of instructions",
+    "Discoverability of actions",
+    "Terminology",
+    "Error prevention",
+    "Navigation"
+  ]
+}

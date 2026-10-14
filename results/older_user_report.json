@@ -1,0 +1,30 @@
+{
+    "persona": "Older / Low-Tech User",
+    "task": "Create an account",
+    "findings": [
+        {
+            "issue": "Ambiguous primary button label",
+            "category": "Clear button labels",
+            "severity": "Medium",
+            "explanation": "Older or low-tech users rely on explicit, unambiguous action labels to understand what will happen next. A label like 'Continue' is vague and does not clearly confirm that clicking it will submit the registration and create the account.",
+            "evidence": "The main submission button is labeled 'Continue ->' instead of an explicit label like 'Create Account' or 'Sign Up'.",
+            "recommendation": "Update the button text to explicitly state the action, such as 'Create Account' or 'Complete Sign Up'."
+        },
+        {
+            "issue": "Low contrast on input field borders and secondary text",
+            "category": "Visual contrast",
+            "severity": "Medium",
+            "explanation": "Users with reduced visual acuity or older adults often struggle to identify the boundaries of form fields when the outlines are very faint gray. Faint secondary text also reduces readability.",
+            "evidence": "Input field boxes for 'Full name', 'Email address', and 'Password' have very light gray borders on a white background, and placeholder text ('Your full name', 'you@example.com', etc.) is rendered in light gray.",
+            "recommendation": "Darken the input borders to at least a 3:1 contrast ratio against the background and ensure all placeholder and subtext meet WCAG AA text contrast standards (at least 4.5:1)."
+        },
+        {
+            "issue": "Abstract form header text",
+            "category": "Text readability",
+            "severity": "Low",
+            "explanation": "Low-tech users benefit from straightforward, literal instructions. Figurative marketing language can create hesitation or uncertainty about whether the user is on the correct page to register.",
+            "evidence": "The registration form heading reads 'Make yourself at home.' with subtext 'A few details, and you're part of the collection.' instead of direct account creation terminology.",
+            "recommendation": "Include clear, descriptive headings such as 'Create an account' or 'Sign up for Omni' directly above the form fields."
+        }
+    ]
+}

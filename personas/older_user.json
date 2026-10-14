@@ -1,0 +1,13 @@
+{
+  "id": "older_user",
+  "name": "Older / Low-Tech User",
+  "technical_skill": "low",
+  "goal": "Create an account comfortably and independently",
+  "criteria": [
+    "Text readability",
+    "Visual contrast",
+    "Clear button labels",
+    "Navigation simplicity",
+    "Understandable error messages"
+  ]
+}
