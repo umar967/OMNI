@@ -1,0 +1,8 @@
+{
+  "name": "omni-frontend",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "check": "node scripts/check.mjs"
+  }
+}
