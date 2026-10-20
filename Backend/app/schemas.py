@@ -45,7 +45,7 @@ class PlanInput(BaseModel):
     persona_id: str
     screenshot_id: str | None = None
     method: Literal['screenshot', 'live'] = 'screenshot'
-    max_actions: int = Field(default=20, ge=1, le=60)
+    max_actions: int = Field(default=4, ge=1, le=60)
     project_id: str | None = None
     mode: Literal['UX'] = 'UX'
 

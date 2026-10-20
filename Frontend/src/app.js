@@ -8,6 +8,7 @@ import { projects, project, projectNew } from "./pages/projects.js";
 import { deck, plan, execution } from "./pages/testing.js";
 import { reports, report, filteredRows } from "./pages/reports.js";
 import { settings, login, onboarding } from "./pages/settings.js";
+import { captureScroll } from "./scroll.js";
 
 let page = "dashboard",
   itemId = "",
@@ -32,7 +33,8 @@ async function refresh() {
     ),
   );
 }
-function draw() {
+function draw({ preserveScroll = true } = {}) {
+  const restoreScroll = preserveScroll ? captureScroll($("#app")) : null;
   document.body.classList.toggle("dark", state.preferences.theme === "dark");
   const views = {
     dashboard,
@@ -54,6 +56,7 @@ function draw() {
       : page === "onboarding"
         ? onboarding()
         : layout((views[page] || dashboard)(), page);
+  restoreScroll?.();
 }
 function redrawKeepingFormValues() {
   const drafts = [...document.forms].map((form) =>
@@ -101,7 +104,7 @@ async function route() {
       state.reportTab = "Overview";
     }
     if (rev !== revision) return;
-    draw();
+    draw({ preserveScroll: false });
     window.scrollTo(0, 0);
     if (page === "execution") schedulePoll();
   } catch (error) {

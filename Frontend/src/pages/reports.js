@@ -47,7 +47,7 @@ function findings(r) {
 
 function feedback(r) {
   const data = r.persona_feedback;
-  if (!data) return "";
+  if (!data) return exploration(r) ? `<div class="hint warning spacer"><strong>Persona feedback is unavailable</strong><p>${esc(r.review_error || r.stop_reason || "The model review did not finish.")}</p><p>${r.actions_recorded || 0} actions were recorded. Open Evidence to inspect them. No usability verdict was produced.</p></div>` : "";
   return `<section class="spacer"><h2>Persona experience</h2><p class="muted spacer">${esc(r.feedback_note || "AI-inferred reactions from recorded interactions, not measured human feelings.")}</p>
     ${[["Overall impression", data.overall_impression ? [data.overall_impression] : []], ["What worked well", data.what_worked_well], ["Difficult moments", data.difficult_moments], ["Suggested improvements", data.suggested_improvements]].map(([label, items]) =>
       items?.length ? `<div class="finding"><h3>${label}</h3>${items.map((item) => `<p class="spacer">${esc(item.comment)}</p><small>Steps ${esc((item.steps || []).join(", "))} · ${esc(item.evidence)}</small>`).join("")}</div>` : "").join("")}</section>`;
@@ -81,7 +81,7 @@ export function report() {
     : r.imported ? "Existing screenshot report. Missing URL, model, screenshot association and run timestamp remain unassigned."
     : "Saved screenshot evaluation. Findings are model observations, not confirmed functional test results.";
   return steps(3) + heading(exploration(r) ? "Exploration report" : r.task || "Evaluation report", `${r.persona} · ${r.method || "Screenshot UX evaluation"}`, btn("↓ Export report JSON", "export-report", "ghost")) + `
-    <div class="hint">${intro}</div><div class="grid cols4 spacer">${[["Recorded findings", r.findings.length], ["High", severity.High], ["Medium", severity.Medium], ["Low", severity.Low]].map(([label, count]) => `<div class="panel stat"><small>${label}</small><strong>${count}</strong></div>`).join("")}</div>
+    <div class="hint">${intro}</div><div class="grid cols4 spacer">${[["Recorded findings", r.findings.length], ["High", severity.High], ["Medium", severity.Medium], ["Low", severity.Low]].map(([label, count]) => `<div class="panel stat"><small>${label}</small><strong>${exploration(r) && r.review_status !== "completed" ? "?" : count}</strong></div>`).join("")}</div>
     <div class="tabs spacer">${[["Overview", "Overview"], [exploration(r) ? "Flow coverage" : "Review cases", "Review cases"], ["Evidence", "Evidence"]].map(([label, key]) => btn(label, "report-tab", key === state.reportTab ? "primary" : "ghost", key)).join("")}</div>
     <div class="deck"><section class="panel">${state.reportTab === "Overview" ? `<h2>Recorded observations</h2>${feedback(r)}${findings(r)}` : state.reportTab === "Review cases" ? scope(r) : evidence(r)}
     ${r.limitations?.length ? `<details class="hint spacer"><summary>Recorded limitations</summary>${r.limitations.map((v) => `<p>${esc(v)}</p>`).join("")}</details>` : ""}</section>

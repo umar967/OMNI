@@ -18,11 +18,12 @@ export const state = {
   screenshots: [],
   draft: read("omni:draft", {
     url: "http://127.0.0.1:5173/login?mode=signup",
-    instructions: "Create an account comfortably and independently.",
+    instructions: "Explore signup and fill the name and email fields. Stop before submitting.",
     persona_id: "older_user",
     screenshot_id: "signup.png",
     project_id: null,
     mode: "UX",
+    max_actions: 4,
   }),
   plan: null,
   run: null,

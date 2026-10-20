@@ -79,6 +79,17 @@ def run_live(item_id, plan, progress):
                         if decision.get('action') == 'stop':
                             stop_reason = 'Persona stopped: ' + decision.get('reason', '')
                             break
+                        if result.startswith('blocked:'):
+                            stop_reason = 'Reached an exploration boundary: ' + result
+                            report['limitations'].append(stop_reason)
+                            break
+                        if len(history) >= 2 and all(
+                            r['decision'].get('action') == decision.get('action') and
+                            r['decision'].get('target') == decision.get('target') and
+                            not any(r['observed_change'].values()) for r in history[-2:]
+                        ):
+                            stop_reason = 'Repeated action without observed progress; moving to feedback.'
+                            break
                         if len(history) >= 4 and all(not any(r['observed_change'].values()) for r in history[-4:]):
                             stop_reason = 'Stopped after four attempts without measured change.'
                             break

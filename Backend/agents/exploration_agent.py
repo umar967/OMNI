@@ -130,6 +130,11 @@ def apply_review(report, review):
     )
     report['review_status'] = 'completed'
     report.pop('review_error', None)
+    feedback = report.get('persona_feedback') or {}
+    if not (feedback.get('overall_impression') or feedback.get('what_worked_well') or
+            feedback.get('difficult_moments') or feedback.get('suggested_improvements') or report['findings']):
+        report['review_status'] = 'not_completed'
+        report['review_error'] = 'No model feedback could be supported by the recorded interactions.'
     report['limitations'] = [item for item in report.get('limitations', [])
                              if not item.startswith('Review failed;')]
 
@@ -158,8 +163,9 @@ def request_ollama(prompt, schema):
                                      'Use short comments and few feedback items.')
                                   if attempt else ''),
             'stream': False, 'format': local_schema(schema), 'think': False,
+            'keep_alive': '15m',
             'options': {'temperature': 0.1,
-                        'num_predict': 700 if is_decision else 2000},
+                        'num_predict': 140 if is_decision else 500},
         }).encode('utf-8')
         request = url_request.Request(
             'http://127.0.0.1:11434/api/generate', data=payload,
@@ -173,6 +179,8 @@ def request_ollama(prompt, schema):
             if not isinstance(answer, dict):
                 raise ValueError('Expected a JSON object')
             notify(f'Local model responded in {time.monotonic() - started:.1f}s.')
+            notify(f'Local inference: {result.get("prompt_eval_count", 0)} input tokens, '
+                   f'{result.get("eval_count", 0)} output tokens.')
             return answer
         except (TimeoutError, socket.timeout, url_error.URLError, KeyError, ValueError) as exc:
             if isinstance(exc, url_error.HTTPError):
@@ -200,6 +208,9 @@ def request_json(prompt, schema):
 
 
 def explore_next(persona, observation, history):
+    if os.getenv('OMNI_MODEL_PROVIDER', 'gemini').lower() == 'ollama':
+        from .local_persona import next_action
+        return next_action(persona, observation, history, request_json)
     schema = {'type': 'OBJECT', 'properties': {
         'action': {'type': 'STRING', 'enum': ['click', 'fill', 'select', 'check',
                     'hover', 'press', 'scroll', 'back', 'home', 'wait', 'stop']},
@@ -263,6 +274,9 @@ Keep reason and area short. Return exactly one complete JSON object.
 
 
 def review_run(persona, history):
+    if os.getenv('OMNI_MODEL_PROVIDER', 'gemini').lower() == 'ollama':
+        from .local_persona import experience
+        return experience(persona, history, request_json)
     comment = {'type': 'OBJECT', 'properties': {
         'comment': {'type': 'STRING'},
         'steps': {'type': 'ARRAY', 'items': {'type': 'INTEGER'}},

@@ -119,6 +119,16 @@ Set `GEMINI_MODEL` to a model available to your key. Optional settings are
 logs show Gemini attempts and retry waits. These are per-request HTTP timeouts,
 not a guaranteed deadline for the entire browser session.
 
+Local CPU sessions use a compact action prompt and a smaller experience-review
+schema. The browser still executes actual actions and records before/after DOM
+observations; prompts omit entered field values and avoid offering already-filled
+fields again. Local decisions allow 140 output tokens and feedback 500, and the
+activity log includes model input/output token counts. The default session is
+four interactions; blocked actions and repeated ineffective actions move to review.
+Local feedback focuses on the impression, a helpful aspect and an improvement;
+it does not generate a separate defect inventory. Missing or unsupported feedback
+is shown explicitly rather than presented as a successful zero-issue evaluation.
+
 To avoid cloud API quotas, install [Ollama](https://ollama.com/download/windows)
 on Windows, download a local model once, and run:
 

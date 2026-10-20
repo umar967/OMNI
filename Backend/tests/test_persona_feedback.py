@@ -81,7 +81,7 @@ class PersonaFeedbackTests(unittest.TestCase):
         self.assertEqual(result['findings'], [])
 
     def test_review_request_uses_experience_schema_and_preserves_reason(self):
-        with patch('Backend.agents.exploration_agent.request_json', return_value=review()) as request:
+        with patch.dict('os.environ', {'OMNI_MODEL_PROVIDER':'gemini'}), patch('Backend.agents.exploration_agent.request_json', return_value=review()) as request:
             review_run({'name': 'First-Time User'}, [interaction()])
         prompt, schema = request.call_args.args
         self.assertIn('persona_feedback', schema['required'])
