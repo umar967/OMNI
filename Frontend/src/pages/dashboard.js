@@ -1,6 +1,6 @@
 /** Dashboard intentionally preserves the prototype's illustrative statistics. */
 import { state } from "../state.js";
-import { btn, heading, landscape, link } from "../components/ui.js";
+import { heading, landscape, link } from "../components/ui.js";
 export function dashboard() {
   return (
     heading(

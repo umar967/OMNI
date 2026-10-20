@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { state, persist } from "./state.js";
-import { esc, toast, empty, link } from "./components/ui.js";
+import { toast, empty, link } from "./components/ui.js";
 import { layout } from "./components/layout.js";
 import { dashboard } from "./pages/dashboard.js";
 import { personas, builder } from "./pages/personas.js";
@@ -54,6 +54,25 @@ function draw() {
       : page === "onboarding"
         ? onboarding()
         : layout((views[page] || dashboard)(), page);
+}
+function redrawKeepingFormValues() {
+  const drafts = [...document.forms].map((form) =>
+    [...form.elements]
+      .filter((el) => el.name && el.type !== "file")
+      .map((el) => ({ name: el.name, value: el.value, checked: el.checked })),
+  );
+  draw();
+  [...document.forms].forEach((form, i) => {
+    [...form.elements]
+      .filter((el) => el.name && el.type !== "file")
+      .forEach((el, j) => {
+        const saved = drafts[i]?.[j];
+        if (saved?.name === el.name) {
+          el.value = saved.value;
+          if (el.type === "checkbox") el.checked = saved.checked;
+        }
+      });
+  });
 }
 async function route() {
   clearTimeout(poll);
@@ -167,14 +186,14 @@ document.addEventListener("click", (event) => {
       state.preferences.theme =
         state.preferences.theme === "dark" ? "light" : "dark";
       persist();
-      draw();
+      redrawKeepingFormValues();
       break;
     case "collapse":
       captureDraft();
       captureCases();
       state.preferences.collapsed = !state.preferences.collapsed;
       persist();
-      draw();
+      redrawKeepingFormValues();
       break;
     case "use-persona":
       state.draft.persona_id = id;

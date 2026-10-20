@@ -36,6 +36,3 @@ export function persist() {
   localStorage.setItem("omni:preferences", JSON.stringify(state.preferences));
   localStorage.setItem("omni:draft", JSON.stringify(state.draft));
 }
-export const currentPersona = () =>
-  state.personas.find((p) => p.id === state.draft.persona_id) ||
-  state.personas[0];

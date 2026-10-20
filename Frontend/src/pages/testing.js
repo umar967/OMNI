@@ -1,4 +1,4 @@
-import { state, currentPersona } from "../state.js";
+import { state } from "../state.js";
 import { imageUrl } from "../api.js";
 import {
   esc,
