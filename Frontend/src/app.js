@@ -318,7 +318,7 @@ document.addEventListener("submit", (event) => {
   });
 });
 document.addEventListener("change", (event) => {
-  if (event.target.id === "screenshot" || event.target.id === "persona") {
+  if (event.target.id === "method" || event.target.id === "screenshot" || event.target.id === "persona") {
     captureDraft();
     draw();
   }

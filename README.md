@@ -104,11 +104,20 @@ python -m Backend.explore_website --url http://127.0.0.1:5173/ --max-actions 40
 The runner loads `Backend/personas/first_time_user.json` and uses Gemini to choose each
 next action from the current viewport, with previous actions and observations as
 memory. It highlights the target and continues automatically; no Enter prompts.
-By default, each decision and the final review use the Gemini API. Requests
-are spaced by 15 seconds, and short quota errors are retried. A retry delay
-over two minutes stops the run immediately and preserves the history. Set
-`GEMINI_MODEL` to use another Gemini model or
-`GEMINI_REQUEST_SPACING_SECONDS` to adjust spacing for your quota.
+By default, each decision and the final review use the Gemini API. Successful
+requests have no artificial spacing. Action requests use a 30-second HTTP timeout;
+final reviews use 60 seconds. Temporary network/server failures get one retry
+after two seconds, with SDK retries disabled to avoid nested retry loops.
+Quota errors are retried only when the API supplies a retry delay of at most
+10 seconds; longer or unspecified waits stop promptly and preserve history.
+A model failure skips the final review to avoid immediately hitting the same
+failure again. Use the saved-run reviewer later to review preserved interactions.
+Set `GEMINI_MODEL` to a model available to your key. Optional settings are
+`GEMINI_ACTION_TIMEOUT_SECONDS`, `GEMINI_REVIEW_TIMEOUT_SECONDS`, and
+`GEMINI_MAX_ATTEMPTS` (total attempts, default 2, capped at 3). The old
+`GEMINI_REQUEST_SPACING_SECONDS` setting is no longer used. Testing Deck activity
+logs show Gemini attempts and retry waits. These are per-request HTTP timeouts,
+not a guaranteed deadline for the entire browser session.
 
 To avoid cloud API quotas, install [Ollama](https://ollama.com/download/windows)
 on Windows, download a local model once, and run:
@@ -175,6 +184,6 @@ All Python features, configuration, tests, and saved data live under `Backend/`.
 
 Reports Library includes both screenshot evaluations and Backend/results/exploration_*/report.json. Exploration reports show recorded persona feedback, candidate observations, flow coverage and sanitized before/after history. Failed or incomplete reviews are labeled accordingly. Browser cookies, browser_state.json and entered field values are not served to the frontend.
 
-`Backend/.env` is the single local environment file and is loaded without exposing its key to the frontend. A configured key does not establish that the model is currently available or its quota is sufficient. New live browser explorations still use `python -m Backend.explore_website`; Testing Deck runs screenshot analysis.
+`Backend/.env` is the single local environment file and is loaded without exposing its key to the frontend. A configured key does not establish that the model is currently available or its quota is sufficient. Testing Deck defaults to **Live persona session**: enter the target URL and task, select a persona and interaction limit, review the criteria, then start. Chrome opens a fresh session, the persona chooses real actions from the live DOM, and Reports Library shows first-person experience feedback with recorded evidence. Screenshot review remains available as a separate method. Google Chrome must be installed. Sessions cannot currently be paused. Account submissions, password entry, payments and external navigation remain blocked, so a signup task can inspect and interact with safe form fields but cannot complete account creation. Feedback is a simulated persona perspective, not a human participant's testimony.
 
 Run all Python tests from the repository root with `.venv/Scripts/python.exe -m unittest discover -s Backend/tests -t . -v`. The API uses `Backend.app.server:app`; `start.ps1` sets the correct working directory.

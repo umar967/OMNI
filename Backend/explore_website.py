@@ -9,6 +9,7 @@ import time
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
 from Backend.flow_coverage import assess_flows
+from Backend.agents.gemini_requests import GeminiRequestError
 
 ROOT = Path(__file__).resolve().parent
 SELECTOR = ('button, a[href], input:not([type="hidden"]), textarea, select, '
@@ -231,6 +232,7 @@ def main():
             'note': 'Persona experience review has not run yet.',
         })
     stop_reason = 'Action limit reached; remaining areas are untested.'
+    model_failed = False
     started = time.monotonic()
     print(f"Persona: {persona['name']} | Provider: {args.provider} | Limit: {args.max_actions} actions\nResults: {run_dir}", flush=True)
     print('Each decision calls the chosen model. Ctrl+C stops exploration and saves progress.', flush=True)
@@ -311,6 +313,7 @@ def main():
         except KeyboardInterrupt:
             stop_reason = 'Stopped by user; partial run.'
         except Exception as exc:
+            model_failed = isinstance(exc, GeminiRequestError)
             stop_reason = f'Execution/model error: {exc}'
         finally:
             context.close()
@@ -328,7 +331,7 @@ def main():
                   'One-second observations can miss delayed responses; no-change is not proof of a defect.']}
     save(run_dir / 'history.json', history)
     save(run_dir / 'report.json', report)
-    if history:
+    if history and not model_failed:
         print('\nReviewing the persona experience from saved interactions...', flush=True)
         try:
             review = clean_review(review_run(persona, history), history)

@@ -4,7 +4,7 @@ import mimetypes
 import os
 from pathlib import Path
 from dotenv import load_dotenv
-from google import genai
+from Backend.agents.gemini_requests import generate_json
 from google.genai import types
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -31,13 +31,9 @@ High = may prevent task completion.
 Return JSON with persona, task, and findings. Each finding must contain issue,
 category, severity (Low/Medium/High), explanation, evidence (visible details),
 and recommendation. No markdown or extra fields.'''
-    with genai.Client(api_key=key, http_options=types.HttpOptions(timeout=120000)) as client:
-        response = client.models.generate_content(
-            model=os.getenv('GEMINI_MODEL', 'gemini-3.8-flash'),
-            contents=[prompt, types.Part.from_bytes(data=Path(screenshot_path).read_bytes(), mime_type=mimetypes.guess_type(str(screenshot_path))[0] or 'image/png')],
-            config=types.GenerateContentConfig(response_mime_type='application/json', temperature=0.2),
-        )
-    result = json.loads(response.text)
+    result = generate_json([prompt, types.Part.from_bytes(
+        data=Path(screenshot_path).read_bytes(),
+        mime_type=mimetypes.guess_type(str(screenshot_path))[0] or 'image/png')])
     if not isinstance(result, dict) or not isinstance(result.get('findings'), list):
         raise ValueError('The model returned an invalid report structure.')
     required = ('issue','category','severity','explanation','evidence','recommendation')

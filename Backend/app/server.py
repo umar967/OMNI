@@ -71,7 +71,7 @@ def screenshot_path(item_id):
 
 @app.get('/api/health')
 def health():
-    return {'status':'ok','workspace':str(Path(__file__).resolve().parents[2]),'gemini_configured':bool(os.getenv('GEMINI_API_KEY')), 'model':os.getenv('GEMINI_MODEL','gemini-3.8-flash'), 'capabilities':{'screenshot_ux':True,'saved_explorations':True,'qa':False,'browser_journeys':False,'pause':False}, 'target_url':'http://127.0.0.1:5173/'}
+    return {'status':'ok','workspace':str(Path(__file__).resolve().parents[2]),'gemini_configured':bool(os.getenv('GEMINI_API_KEY')), 'model':os.getenv('GEMINI_MODEL','gemini-3.8-flash'), 'capabilities':{'screenshot_ux':True,'saved_explorations':True,'qa':False,'browser_journeys':True,'pause':False}, 'target_url':'http://127.0.0.1:5173/'}
 
 @app.get('/api/personas')
 def list_personas():
@@ -182,7 +182,7 @@ def create_plan(body:PlanInput):
     if body.project_id:
         get_record('projects',body.project_id)
     criteria = person.get('criteria',[])
-    item = dict(body.model_dump(),id=db.identifier(),persona=person,created_at=db.now(),planner='persona_criteria', cases=[{'id':db.identifier(),'title':f'Review {criterion}','expected':f'Inspect visible evidence relevant to {criterion.lower()} for {person["name"]}.','selected':True} for criterion in criteria])
+    item = dict(body.model_dump(),id=db.identifier(),persona=person,created_at=db.now(),planner='persona_criteria', cases=[{'id':db.identifier(),'title':f'Review {criterion}','expected':f'Inspect recorded evidence relevant to {criterion.lower()} for {person["name"]}.','selected':True} for criterion in criteria])
     if not item['cases']:
         raise HTTPException(400,'The selected persona has no evaluation criteria.')
     db.write(db.safe_file('plans',item['id']),item)
@@ -214,8 +214,13 @@ def evaluate_run(item_id,plan):
     try:
         if plan.get('method') == 'live':
             from .live import run_live
+            from Backend.agents.gemini_requests import status_callback
             progress(item_id,'Opening Chrome for the selected persona.',status='running',stage='preparing')
-            run_live(item_id, plan, progress)
+            token = status_callback.set(lambda message: progress(item_id, message))
+            try:
+                run_live(item_id, plan, progress)
+            finally:
+                status_callback.reset(token)
             return
         progress(item_id,'Preparing the selected screenshot and persona.',status='running',stage='preparing')
         path = screenshot_path(plan['screenshot_id'])

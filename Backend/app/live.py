@@ -5,6 +5,7 @@ from urllib.parse import urlsplit
 from playwright.sync_api import sync_playwright
 from Backend.explore_website import observe, execute, release
 from Backend.agents.exploration_agent import explore_next, review_run, clean_review, apply_review
+from Backend.agents.gemini_requests import GeminiRequestError
 from . import storage as db
 
 
@@ -26,6 +27,7 @@ def run_live(item_id, plan, progress):
     db.write(folder / 'report.json', report)
     started = time.monotonic()
     stop_reason = 'Action limit reached; remaining areas are untested.'
+    model_failed = False
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(channel='chrome', headless=False)
@@ -81,6 +83,10 @@ def run_live(item_id, plan, progress):
                         release(handles)
             finally:
                 browser.close()
+    except GeminiRequestError as exc:
+        stop_reason = str(exc)
+        model_failed = True
+        report['run_status'] = 'failed'
     except Exception:
         stop_reason = 'Browser or model execution failed; recorded actions remain available.'
         report['run_status'] = 'failed'
@@ -88,10 +94,12 @@ def run_live(item_id, plan, progress):
         report['run_status'] = 'finished'
     report['stop_reason'] = stop_reason
     db.write(folder / 'history.json', history)
-    if history:
+    if history and not model_failed:
         progress(item_id, 'Writing persona feedback from the recorded visit.', stage='reviewing')
         try:
             apply_review(report, clean_review(review_run(persona, history), history))
+        except GeminiRequestError as exc:
+            report['review_error'] = str(exc)
         except Exception:
             report['review_error'] = 'Experience review failed. Recorded interactions remain available.'
     db.write(folder / 'report.json', report)

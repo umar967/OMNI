@@ -8,7 +8,7 @@ from urllib import request as url_request
 from dotenv import load_dotenv
 from pathlib import Path
 
-_last_request_at = 0.0
+from Backend.agents.gemini_requests import generate_json
 
 
 def compact_history(history):
@@ -183,48 +183,13 @@ def request_ollama(prompt, schema):
 
 
 def request_json(prompt, schema):
-    global _last_request_at
     load_dotenv(Path(__file__).resolve().parents[1] / '.env')
     provider = os.getenv('OMNI_MODEL_PROVIDER', 'gemini').lower()
     if provider == 'ollama':
         return request_ollama(prompt, schema)
     if provider != 'gemini':
         raise ValueError(f'Unsupported model provider: {provider}')
-    from google import genai
-    from google.genai import types
-    client = genai.Client(api_key=os.environ['GEMINI_API_KEY'])
-    try:
-        for attempt in range(4):
-            # The observed free-tier quota was five requests per minute.
-            # Spacing includes the final review call.
-            spacing = float(os.getenv('GEMINI_REQUEST_SPACING_SECONDS', '15'))
-            delay = max(0.0, spacing - (time.monotonic() - _last_request_at))
-            if delay:
-                print(f'Waiting {delay:.0f}s before the next Gemini request...', flush=True)
-                time.sleep(delay)
-            _last_request_at = time.monotonic()
-            try:
-                response = client.models.generate_content(
-                    model=os.getenv('GEMINI_MODEL', 'gemini-3.8-flash'),
-                    contents=prompt,
-                    config=types.GenerateContentConfig(response_mime_type='application/json',
-                                                       response_schema=schema, temperature=0.2))
-                return json.loads(response.text)
-            except Exception as exc:
-                message = str(exc)
-                if attempt == 3 or not ('429' in message or 'RESOURCE_EXHAUSTED' in message):
-                    raise
-                match = re.search(r'retry(?:Delay| in)\D*(\d+(?:\.\d+)?)\s*s', message, re.I)
-                wait = max(60.0, float(match.group(1)) + 3.0) if match else 63.0
-                if wait > 120:
-                    raise RuntimeError(
-                        f'Gemini quota requires about {wait / 3600:.1f} hours before retry. '
-                        'Stopping now; saved history remains available. '
-                        'Use --provider ollama for local exploration.') from exc
-                print(f'Gemini quota reached; retrying in {wait:.0f}s...', flush=True)
-                time.sleep(wait)
-    finally:
-        client.close()
+    return generate_json(prompt, schema, decision='action' in schema.get('properties', {}))
 
 
 def explore_next(persona, observation, history):

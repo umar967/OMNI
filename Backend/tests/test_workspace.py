@@ -46,6 +46,53 @@ class WorkspaceTests(unittest.TestCase):
         self.assertIn('src/app.js',self.client.get('/').text)
         self.assertEqual(self.client.get('/api/screenshots/signup.png').status_code,200)
 
+    def test_live_plan_without_screenshot_and_partial_report(self):
+        body = {'url':'https://example.com/', 'instructions':'Find the help page',
+                'persona_id':'older_user', 'method':'live', 'max_actions':3}
+        response = self.post('/api/plans', body)
+        self.assertEqual(response.status_code, 201)
+        plan = response.json()
+        self.assertIsNone(plan['screenshot_id'])
+        with patch.dict(os.environ, {'GEMINI_API_KEY':'test'}), patch('Backend.app.server.EXECUTOR.submit'):
+            run = self.post('/api/runs', {'plan_id':plan['id']}).json()
+            with patch('Backend.app.live.sync_playwright', side_effect=RuntimeError('browser unavailable')):
+                evaluate_run(run['id'], plan)
+        saved = self.client.get('/api/runs/' + run['id']).json()
+        self.assertEqual(saved['status'], 'failed')
+        report = self.client.get('/api/reports/' + saved['report_id']).json()
+        self.assertEqual(report['kind'], 'exploration')
+        self.assertEqual(report['task'], body['instructions'])
+        self.assertEqual(report['actions_recorded'], 0)
+        self.assertEqual(report['review_status'], 'not_completed')
+        self.assertEqual(self.client.get('/api/reports/' + saved['report_id'] + '/evidence').json(), [])
+        body['url'] = 'http://127.0.0.1:8000/'
+        self.assertEqual(self.post('/api/plans', body).status_code, 400)
+        body['max_actions'] = 1000
+        self.assertEqual(self.post('/api/plans', body).status_code, 422)
+
+    def test_live_quota_failure_preserves_steps_without_another_model_call(self):
+        from Backend.app.live import run_live
+        from Backend.agents.gemini_requests import GeminiRequestError
+        from unittest.mock import MagicMock
+        plan = dict(self.plan(), method='live', max_actions=3)
+        browser_api = MagicMock()
+        state = {'url':plan['url'], 'visible_text':'Help', 'controls':[], 'scroll':{'y':0}}
+        action = {'action':'scroll', 'target':-1, 'value':'down', 'reason':'Find help'}
+        with patch('Backend.app.live.sync_playwright', return_value=browser_api), \
+             patch('Backend.app.live.observe', return_value=(state, {})), \
+             patch('Backend.app.live.execute', return_value='executed'), \
+             patch('Backend.app.live.explore_next', side_effect=[action, GeminiRequestError('Gemini quota reached.')]), \
+             patch('Backend.app.live.review_run') as review:
+            progress = MagicMock()
+            run_live('quota_test', plan, progress)
+        review.assert_not_called()
+        report = db.read(db.directory('results')/'exploration_quota_test'/'report.json')
+        self.assertEqual(report['actions_recorded'], 1)
+        self.assertEqual(report['run_status'], 'failed')
+        self.assertIn('quota', report['stop_reason'])
+        self.assertEqual(len(db.report_evidence('exploration_quota_test')), 1)
+        self.assertEqual(progress.call_args.kwargs['status'], 'failed')
+
     def test_create_edit_persona_and_project(self):
         body={'name':'Presentation visitor','goal':'Complete signup','criteria':['Readable text','Clear labels']}
         person=self.post('/api/personas',body).json()
