@@ -2,5 +2,11 @@
 .venv/
 __pycache__/
 *.py[cod]
-_pycache__/
-*.pyc
+Backend/results/exploration_*/
+
+node_modules/
+/Backend/projects/
+/Backend/plans/
+/Backend/runs/
+/Backend/screenshot_meta/
+*.tmp

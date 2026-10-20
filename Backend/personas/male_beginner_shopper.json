@@ -1,0 +1,21 @@
+{
+  "id": "male_beginner_shopper",
+  "name": "Male / Occasional Online Shopper",
+  "gender": "male",
+  "technical_skill": "basic",
+  "online_shopping_experience": "Has bought a few items online but is unfamiliar with this website",
+  "goal": "Find the Arc Table Lamp, add one to the shopping bag, and verify it is there. Stop before checkout.",
+  "behavior_preferences": [
+    "Prefers clear product names and explicit action labels",
+    "Looks for confirmation after adding an item",
+    "Uses familiar navigation and visible instructions"
+  ],
+  "criteria": [
+    "Discoverability of products",
+    "Clarity of shopping terminology",
+    "Clear button labels",
+    "Feedback after actions",
+    "Ease of checking bag contents",
+    "Understandable error messages"
+  ]
+}

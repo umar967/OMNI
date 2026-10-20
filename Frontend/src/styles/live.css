@@ -1,0 +1,116 @@
+/* Connected workspace additions; visual tokens remain in app.css. */
+.screen-preview {
+  display: block;
+  width: 100%;
+  max-height: 280px;
+  object-fit: contain;
+  object-position: top;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+}
+.evidence-full {
+  max-height: 600px;
+}
+.wrap {
+  flex-wrap: wrap;
+}
+.upload {
+  margin: 0;
+  border: 1px solid var(--line);
+  padding: 12px 16px;
+  border-radius: 9px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.upload:hover {
+  border-color: var(--accent);
+}
+.warning {
+  background: #f1e4d5;
+  color: #684421;
+}
+.dark .warning {
+  background: #493d2e;
+  color: #ead3b0;
+}
+.context-value {
+  max-width: 70%;
+  text-align: right;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+.stage-list {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.busy {
+  position: fixed;
+  bottom: 25px;
+  right: 25px;
+  background: var(--ink);
+  color: var(--bg);
+  padding: 12px 20px;
+  border-radius: 10px;
+  z-index: 80;
+}
+.testcase textarea {
+  min-height: 80px;
+}
+.tag {
+  line-height: 1.5;
+}
+form .foot {
+  margin-top: 28px;
+}
+body {
+  overflow-wrap: break-word;
+}
+button:disabled:hover {
+  transform: none;
+}
+.report-count {
+  font-size: 12px;
+}
+input[type="file"] + small {
+  display: block;
+}
+.main {
+  min-width: 0;
+}
+.deck > * {
+  min-width: 0;
+}
+a img:hover {
+  border-color: var(--accent);
+}
+@media (prefers-reduced-motion: reduce) {
+  * {
+    transition: none !important;
+    animation: none !important;
+  }
+}
+@media (max-width: 750px) {
+  .row.wrap > input {
+    min-width: 180px;
+  }
+  .context-value {
+    font-size: 11px;
+  }
+  .testcase {
+    gap: 8px;
+  }
+  .testcase .casebody {
+    min-width: 0;
+  }
+  .testcase .icon {
+    padding: 8px;
+  }
+  .cols4 .stat strong {
+    font-size: 24px;
+  }
+  .topright .pill {
+    display: none;
+  }
+}

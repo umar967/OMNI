@@ -1,0 +1,63 @@
+{
+  "site": "OMNI TestLab",
+  "description": "Coverage checks for the current demo website. These are observations, not instructions to the AI persona.",
+  "flows": [
+    {
+      "id": "collection",
+      "name": "Open the product collection",
+      "attempt_action": "click",
+      "attempt_target": "Explore the collection|Shop all essentials|Discover",
+      "confirm_url": "/products(?:[/?#]|$)"
+    },
+    {
+      "id": "filter",
+      "name": "Apply a product filter",
+      "attempt_action": "click|check",
+      "attempt_target": "Filters|Lighting|Review selection|Confirm selection|Apply filters",
+      "confirm_url": "/products\\?[^#]*category="
+    },
+    {
+      "id": "product_details",
+      "name": "Open product details",
+      "attempt_action": "click",
+      "attempt_target": "View .+|Arc Table Lamp|Form Lounge Chair|Studio Headphones|Pebble Ceramic Vase",
+      "confirm_new_text": "Add to bag"
+    },
+    {
+      "id": "add_to_bag",
+      "name": "Add a product to the bag",
+      "attempt_action": "click",
+      "attempt_target": "Add to bag|Add .+ to bag",
+      "confirm_control": "Shopping bag, [1-9][0-9]* items?"
+    },
+    {
+      "id": "view_bag",
+      "name": "View the shopping bag",
+      "attempt_action": "click",
+      "attempt_target": "Shopping bag.*",
+      "confirm_url": "/cart(?:[/?#]|$)",
+      "confirm_text": "Your bag"
+    },
+    {
+      "id": "search",
+      "name": "Search the collection",
+      "attempt_action": "click|fill|press",
+      "attempt_target": "Search products|Search collection",
+      "confirm_url": "/products\\?[^#]*(?:search|q)="
+    },
+    {
+      "id": "saved_items",
+      "name": "Save a product",
+      "attempt_action": "click",
+      "attempt_target": "Save .+",
+      "confirm_control": "Saved \\([1-9][0-9]*\\)"
+    },
+    {
+      "id": "account_access",
+      "name": "Open account access",
+      "attempt_action": "click",
+      "attempt_target": "Log in|Sign in",
+      "confirm_url": "/(?:login|sign-in|account)(?:[/?#]|$)"
+    }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "id": "female_experienced_shopper",
+  "name": "Female / Experienced Online Shopper",
+  "gender": "female",
+  "technical_skill": "intermediate",
+  "online_shopping_experience": "Regularly shops online but is unfamiliar with this website",
+  "goal": "Find the Arc Table Lamp, add one to the shopping bag, and verify it is there. Stop before checkout.",
+  "behavior_preferences": [
+    "Uses familiar shopping conventions to navigate efficiently",
+    "Checks relevant product information before adding an item",
+    "Expects clear bag updates and easy quantity management"
+  ],
+  "criteria": [
+    "Efficiency of finding products",
+    "Availability of product information",
+    "Consistency with shopping conventions",
+    "Feedback after actions",
+    "Ease of checking bag contents",
+    "Unnecessary steps"
+  ]
+}
