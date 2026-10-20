@@ -223,18 +223,20 @@ Reports Library includes both screenshot evaluations and Backend/results/explora
 
 Run all Python tests from the repository root with `.venv/Scripts/python.exe -m unittest discover -s Backend/tests -t . -v`. The API uses `Backend.app.server:app`; `start.ps1` sets the correct working directory.
 
-## Optional OMNI-TestLab submodule
+## Separate OMNI-TestLab folder
 
-OMNI-TestLab is the separate evaluation target, served on port 5173. OMNI itself
-runs on port 8000. The existing GitHub submodule is preserved; initialize it with:
+OMNI-TestLab lives outside this repository, for example at `D:\FYP\OMNI-TestLab`.
+OMNI runs at `http://127.0.0.1:8000`; TestLab runs separately on port 5173.
+Start the existing external TestLab project in another PowerShell terminal:
 
 ```powershell
-git submodule update --init --recursive
-cd OMNI-TestLab
+cd D:\FYP\OMNI-TestLab
 npm install
-npm run dev
+npm run dev -- --port 5173
 ```
 
-You can also point Testing Deck at another website. The submodule is not required
-for OMNI's API or frontend to start. Dependencies are maintained in the root
-`requirements.txt`; `Backend/requirements.txt` remains a compatible entry point.
+For a fresh setup, clone `https://github.com/umar967/OMNI-TestLab.git` into a
+sibling folder, not inside OMNI. TestLab is not a Git submodule of this repository.
+Testing Deck connects through its URL and can also target other websites.
+Dependencies for OMNI are maintained in the root `requirements.txt`;
+`Backend/requirements.txt` remains a compatible entry point.
