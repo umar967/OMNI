@@ -9,7 +9,7 @@ import time
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
 from Backend.flow_coverage import assess_flows
-from Backend.agents.gemini_requests import GeminiRequestError
+from Backend.agents.gemini_requests import ModelRequestError
 
 ROOT = Path(__file__).resolve().parent
 SELECTOR = ('button, a[href], input:not([type="hidden"]), textarea, select, '
@@ -313,7 +313,7 @@ def main():
         except KeyboardInterrupt:
             stop_reason = 'Stopped by user; partial run.'
         except Exception as exc:
-            model_failed = isinstance(exc, GeminiRequestError)
+            model_failed = isinstance(exc, ModelRequestError)
             stop_reason = f'Execution/model error: {exc}'
         finally:
             context.close()

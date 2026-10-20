@@ -47,7 +47,7 @@ class GeminiRequestTests(unittest.TestCase):
 
     def test_timeout_stops_after_two_attempts(self):
         self.client.models.generate_content.side_effect = httpx.ReadTimeout('private request data')
-        with self.assertRaisesRegex(GeminiRequestError, 'after 2 attempts'):
+        with self.assertRaisesRegex(GeminiRequestError, 'timed out.*after 2 attempts'):
             generate_json('prompt')
         self.assertEqual(self.client.models.generate_content.call_count, 2)
         self.sleep.assert_called_once_with(2)

@@ -12,8 +12,12 @@ from google.genai import types
 status_callback = ContextVar('gemini_status', default=None)
 
 
-class GeminiRequestError(RuntimeError):
+class ModelRequestError(RuntimeError):
     """Safe to show in the UI; never includes API response bodies or credentials."""
+
+
+class GeminiRequestError(ModelRequestError):
+    pass
 
 
 def notify(message):
@@ -47,6 +51,12 @@ def generate_json(contents, schema=None, decision=False):
                 return result
             except Exception as exc:
                 code = getattr(exc, 'code', None)
+                if isinstance(exc, (httpx.TimeoutException, TimeoutError)):
+                    cause = f'Gemini timed out waiting for a response (request timeout {timeout:g}s)'
+                elif isinstance(exc, httpx.TransportError):
+                    cause = 'Could not connect reliably to Gemini (network or TLS connection error)'
+                else:
+                    cause = f'Gemini returned HTTP {code}'
                 transient = isinstance(exc, (httpx.TransportError, TimeoutError)) or code in (408, 429, 500, 502, 503, 504)
                 if not transient:
                     raise GeminiRequestError('Gemini rejected the request or returned invalid JSON. Check the model and API configuration.') from exc
@@ -61,6 +71,6 @@ def generate_json(contents, schema=None, decision=False):
                         raise GeminiRequestError('Gemini quota reached. Stopped without a long wait; recorded interactions are preserved. Check quota in AI Studio before retrying.') from exc
                     delay = max(delay, hint)
                 if attempt + 1 >= attempts:
-                    raise GeminiRequestError(f'Gemini request failed after {attempts} attempts. Recorded interactions are preserved; retry later.') from exc
-                notify(f'Gemini temporarily unavailable; retrying in {delay:g}s.')
+                    raise GeminiRequestError(f'{cause} after {attempts} attempts. Any recorded interactions are preserved. Check connectivity and model availability before retrying.') from exc
+                notify(f'{cause}; retrying in {delay:g}s.')
                 time.sleep(delay)

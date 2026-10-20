@@ -71,7 +71,8 @@ def screenshot_path(item_id):
 
 @app.get('/api/health')
 def health():
-    return {'status':'ok','workspace':str(Path(__file__).resolve().parents[2]),'gemini_configured':bool(os.getenv('GEMINI_API_KEY')), 'model':os.getenv('GEMINI_MODEL','gemini-3.8-flash'), 'capabilities':{'screenshot_ux':True,'saved_explorations':True,'qa':False,'browser_journeys':True,'pause':False}, 'target_url':'http://127.0.0.1:5173/'}
+    provider = os.getenv('OMNI_MODEL_PROVIDER', 'gemini').lower()
+    return {'status':'ok','workspace':str(Path(__file__).resolve().parents[2]),'gemini_configured':bool(os.getenv('GEMINI_API_KEY')), 'provider':provider, 'model':os.getenv('OLLAMA_MODEL','qwen3:4b') if provider == 'ollama' else os.getenv('GEMINI_MODEL','gemini-3.8-flash'), 'capabilities':{'screenshot_ux':True,'saved_explorations':True,'qa':False,'browser_journeys':True,'pause':False}, 'target_url':'http://127.0.0.1:5173/'}
 
 @app.get('/api/personas')
 def list_personas():
@@ -243,7 +244,8 @@ def create_run(body:RunInput):
     plan = get_record('plans',body.plan_id)
     if not any(c['selected'] for c in plan['cases']):
         raise HTTPException(400,'Select at least one review case.')
-    if not os.getenv('GEMINI_API_KEY'):
+    needs_gemini = plan.get('method') != 'live' or os.getenv('OMNI_MODEL_PROVIDER', 'gemini').lower() != 'ollama'
+    if needs_gemini and not os.getenv('GEMINI_API_KEY'):
         raise HTTPException(503,'Add GEMINI_API_KEY to Backend/.env and restart the backend. Your saved reports remain available.')
     with db.LOCK:
         if any(r['status'] in ('queued','running') for r in db.records('runs')):

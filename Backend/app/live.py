@@ -1,11 +1,12 @@
 """Run the selected persona against a real page and retain its interaction journal."""
 import time
+import os
 from urllib.parse import urlsplit
 
 from playwright.sync_api import sync_playwright
 from Backend.explore_website import observe, execute, release
 from Backend.agents.exploration_agent import explore_next, review_run, clean_review, apply_review
-from Backend.agents.gemini_requests import GeminiRequestError
+from Backend.agents.gemini_requests import ModelRequestError
 from . import storage as db
 
 
@@ -19,6 +20,8 @@ def run_live(item_id, plan, progress):
     report = dict(persona=persona['name'], run_id=item_id, created_at=db.now(),
                   task=plan['instructions'], url=plan['url'], project_id=plan['project_id'],
                   persona_id=plan['persona_id'], findings=[], persona_feedback=None,
+                  provider=os.getenv('OMNI_MODEL_PROVIDER', 'gemini'),
+                  model=os.getenv('OLLAMA_MODEL', 'qwen3:4b') if os.getenv('OMNI_MODEL_PROVIDER', 'gemini').lower() == 'ollama' else os.getenv('GEMINI_MODEL', 'gemini-3.8-flash'),
                   feedback_type='simulated_persona_experience', review_status='not_completed',
                   run_status='running', actions_recorded=0,
                   limitations=['Persona reactions are simulated from recorded interactions.',
@@ -83,7 +86,7 @@ def run_live(item_id, plan, progress):
                         release(handles)
             finally:
                 browser.close()
-    except GeminiRequestError as exc:
+    except ModelRequestError as exc:
         stop_reason = str(exc)
         model_failed = True
         report['run_status'] = 'failed'
@@ -98,7 +101,7 @@ def run_live(item_id, plan, progress):
         progress(item_id, 'Writing persona feedback from the recorded visit.', stage='reviewing')
         try:
             apply_review(report, clean_review(review_run(persona, history), history))
-        except GeminiRequestError as exc:
+        except ModelRequestError as exc:
             report['review_error'] = str(exc)
         except Exception:
             report['review_error'] = 'Experience review failed. Recorded interactions remain available.'

@@ -1,5 +1,6 @@
 """Model decisions for live exploration; existing screenshot agents stay intact."""
 import json
+import socket
 import os
 import re
 import time
@@ -8,7 +9,7 @@ from urllib import request as url_request
 from dotenv import load_dotenv
 from pathlib import Path
 
-from Backend.agents.gemini_requests import generate_json
+from Backend.agents.gemini_requests import generate_json, ModelRequestError, notify
 
 
 def compact_history(history):
@@ -146,9 +147,9 @@ def local_schema(value):
 def request_ollama(prompt, schema):
     model = os.getenv('OLLAMA_MODEL', 'qwen3:4b')
     is_decision = 'action' in schema.get('properties', {})
-    timeout = float(os.getenv('OLLAMA_TIMEOUT_SECONDS', '600'))
-    attempt = 0
-    while True:
+    timeout = max(1, min(180, float(os.getenv('OLLAMA_TIMEOUT_SECONDS', '120'))))
+    attempts = max(1, min(2, int(os.getenv('OLLAMA_MAX_ATTEMPTS', '1'))))
+    for attempt in range(attempts):
         payload = json.dumps({
             'model': model,
             'prompt': prompt + ('\nReturn one complete, concise JSON object now. '
@@ -163,23 +164,29 @@ def request_ollama(prompt, schema):
         request = url_request.Request(
             'http://127.0.0.1:11434/api/generate', data=payload,
             headers={'Content-Type': 'application/json'}, method='POST')
-        print(f'Waiting for local Ollama model {model} '
-              f'(up to {timeout:.0f}s per attempt)...', flush=True)
+        notify(f'Local {model}: request {attempt + 1}/{attempts}; timeout {timeout:g}s.')
         started = time.monotonic()
         try:
             with url_request.urlopen(request, timeout=timeout) as response:
                 result = json.load(response)
             answer = json.loads(result['response'])
-            print(f'Ollama responded in {time.monotonic() - started:.1f}s.',
-                  flush=True)
+            if not isinstance(answer, dict):
+                raise ValueError('Expected a JSON object')
+            notify(f'Local model responded in {time.monotonic() - started:.1f}s.')
             return answer
-        except (TimeoutError, url_error.URLError, KeyError,
-                json.JSONDecodeError) as exc:
-            attempt += 1
-            print(f'Ollama request failed ({type(exc).__name__}: {exc}). '
-                  'Retrying the same request in 10 seconds; press Ctrl+C to stop.',
-                  flush=True)
-            time.sleep(10)
+        except (TimeoutError, socket.timeout, url_error.URLError, KeyError, ValueError) as exc:
+            if isinstance(exc, url_error.HTTPError):
+                reason = f'Ollama returned HTTP {exc.code}. Check that the configured model is installed.'
+            elif isinstance(exc, (TimeoutError, socket.timeout)):
+                reason = f'Local {model} did not respond within {timeout:g}s.'
+            elif isinstance(exc, url_error.URLError):
+                reason = 'Cannot reach Ollama. Start Ollama and check port 11434.'
+            else:
+                reason = 'Ollama returned an invalid response.'
+            if attempt + 1 >= attempts or isinstance(exc, url_error.HTTPError):
+                raise ModelRequestError(reason + ' Any recorded interactions are preserved.') from exc
+            notify(reason + ' Retrying once in 2s.')
+            time.sleep(2)
 
 
 def request_json(prompt, schema):

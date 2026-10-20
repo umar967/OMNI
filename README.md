@@ -131,6 +131,12 @@ The Ollama option uses only its local endpoint at `127.0.0.1:11434` for model
 decisions and review, so it requires no Gemini API key or per-request cloud
 quota. It does require enough local memory and may be slower or less reliable
 than a cloud model. Review actions and findings against the saved history.
+To use it from Testing Deck, set `OMNI_MODEL_PROVIDER=ollama` and
+`OLLAMA_MODEL=qwen3:4b` in `Backend/.env`, then restart the backend. Ollama
+must be running with that model installed. Live sessions do not require a Gemini
+key in this mode; screenshot reviews still use Gemini. Local requests default to
+one attempt with a 120-second timeout (`OLLAMA_MAX_ATTEMPTS` and
+`OLLAMA_TIMEOUT_SECONDS`), and request progress appears in the session log.
 If only the final review times out, retry it without replaying the browser:
 
 ```powershell
