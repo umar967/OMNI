@@ -81,7 +81,7 @@ To run a persona-based UX evaluation:
 python -m Backend.main
 ```
 
-By default, `Backend/main.py` evaluates `Backend/screenshots/signup.png` using the older-user persona and writes the result to `Backend/results/older_user_report.json`. Use `--persona`, `--screenshot`, `--task`, and `--output` to override these defaults; run `python -m Backend.main --help` for details.
+By default, `Backend/main.py` evaluates `Backend/screenshots/signup.png` using the older-user persona and writes the result to `Backend/results/cli_report.json`. Use `--persona`, `--screenshot`, `--task`, and `--output` to override these defaults; run `python -m Backend.main --help` for details.
 
 ## Report format
 
@@ -222,3 +222,19 @@ Reports Library includes both screenshot evaluations and Backend/results/explora
 `Backend/.env` is the single local environment file and is loaded without exposing its key to the frontend. A configured key does not establish that the model is currently available or its quota is sufficient. Testing Deck defaults to **Live persona session**: enter the target URL and task, select a persona and interaction limit, review the criteria, then start. Chrome opens a fresh session, the persona chooses real actions from the live DOM, and Reports Library shows first-person experience feedback with recorded evidence. Screenshot review remains available as a separate method. Google Chrome must be installed. Sessions cannot currently be paused. Account submissions, password entry, payments and external navigation remain blocked, so a signup task can inspect and interact with safe form fields but cannot complete account creation. Feedback is a simulated persona perspective, not a human participant's testimony.
 
 Run all Python tests from the repository root with `.venv/Scripts/python.exe -m unittest discover -s Backend/tests -t . -v`. The API uses `Backend.app.server:app`; `start.ps1` sets the correct working directory.
+
+## Optional OMNI-TestLab submodule
+
+OMNI-TestLab is the separate evaluation target, served on port 5173. OMNI itself
+runs on port 8000. The existing GitHub submodule is preserved; initialize it with:
+
+```powershell
+git submodule update --init --recursive
+cd OMNI-TestLab
+npm install
+npm run dev
+```
+
+You can also point Testing Deck at another website. The submodule is not required
+for OMNI's API or frontend to start. Dependencies are maintained in the root
+`requirements.txt`; `Backend/requirements.txt` remains a compatible entry point.

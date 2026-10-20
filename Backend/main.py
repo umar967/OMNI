@@ -10,7 +10,7 @@ def main():
     parser.add_argument('--persona', type=Path, default=root/'personas/older_user.json')
     parser.add_argument('--screenshot', type=Path, default=root/'screenshots/signup.png')
     parser.add_argument('--task', default='Create an account')
-    parser.add_argument('--output', type=Path, default=root/'results/older_user_report.json')
+    parser.add_argument('--output', type=Path, default=root/'results/cli_report.json')
     args = parser.parse_args()
     result = evaluate_ux(json.loads(args.persona.read_text(encoding='utf-8')),args.task,args.screenshot)
     args.output.parent.mkdir(parents=True, exist_ok=True)

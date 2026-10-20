@@ -10,3 +10,21 @@ node_modules/
 /Backend/runs/
 /Backend/screenshot_meta/
 *.tmp
+_pycache__/
+*.pyc
+Frontend/dist/
+# Keep the original personas, results and screenshots tracked. Ignore new local records.
+Backend/projects/*.json
+Backend/plans/*.json
+Backend/runs/*.json
+Backend/screenshot_meta/*.json
+Backend/results/*.json
+!Backend/results/older_user_report.json
+!Backend/results/first_time_user_report.json
+Backend/screenshots/*.png
+Backend/screenshots/*.jpg
+Backend/screenshots/*.jpeg
+!Backend/screenshots/signup.png
+Backend/personas/*.json
+!Backend/personas/older_user.json
+!Backend/personas/first_time_user.json
