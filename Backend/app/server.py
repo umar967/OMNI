@@ -2,6 +2,7 @@
 import base64
 import io
 import os
+import re
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -270,6 +271,16 @@ def get_report(item_id:str):
 def get_report_evidence(item_id:str):
     get_report(item_id)
     return db.report_evidence(item_id)
+
+@app.get('/api/reports/{item_id}/evidence/{filename}')
+def get_evidence_image(item_id:str, filename:str):
+    source = db.report_sources().get(item_id)
+    if not source or source.name != 'report.json' or not re.fullmatch(r'step-[1-9][0-9]*-(before|after)\.png', filename):
+        raise HTTPException(404, 'Screenshot not found.')
+    path = source.parent / 'evidence' / filename
+    if not path.is_file() or path.resolve().parent != (source.parent / 'evidence').resolve():
+        raise HTTPException(404, 'Screenshot not found.')
+    return FileResponse(path, media_type='image/png')
 
 FRONTEND = Path(__file__).resolve().parents[2] / 'Frontend'
 app.mount('/',StaticFiles(directory=FRONTEND,html=True),name='frontend')

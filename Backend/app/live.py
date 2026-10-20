@@ -8,6 +8,7 @@ from Backend.explore_website import observe, execute, release
 from Backend.agents.exploration_agent import explore_next, review_run, clean_review, apply_review
 from Backend.agents.gemini_requests import ModelRequestError
 from . import storage as db
+from .visual_evidence import capture_step
 
 
 def run_live(item_id, plan, progress):
@@ -59,6 +60,14 @@ def run_live(item_id, plan, progress):
                     try:
                         progress(item_id, f'Step {step}: persona is deciding what to do.', stage='exploring')
                         decision = explore_next(persona, before, history)
+                        target = handles.get(decision.get('target'))
+                        label = next((c['name'] for c in before['controls'] if c['id'] == decision.get('target')), '')
+                        images = {}
+                        for phase in ('before',):
+                            try:
+                                images[phase] = capture_step(page, folder, step, phase, target)
+                            except Exception:
+                                progress(item_id, f'Step {step}: screenshot capture unavailable; interaction evidence will still be saved.')
                         result, error = 'agent_stopped', None
                         if decision.get('action') != 'stop':
                             try:
@@ -66,11 +75,16 @@ def run_live(item_id, plan, progress):
                             except Exception:
                                 result, error = 'automation_error', 'Browser action could not be completed.'
                         page.wait_for_timeout(1000)
+                        try:
+                            images['after'] = capture_step(page, folder, step, 'after', target)
+                        except Exception:
+                            progress(item_id, f'Step {step}: after screenshot unavailable.')
                         after, after_handles = observe(page)
                         release(after_handles)
                         history.append(dict(step=step, elapsed_seconds=round(time.monotonic()-started, 2),
                                             before=before, after=after, decision=decision, result=result,
                                             automation_error=error,
+                                            screenshots=images, target_label=label,
                                             observed_change={k: before[k] != after[k] for k in before}))
                         db.write(folder / 'history.json', history)
                         report['actions_recorded'] = len(history)

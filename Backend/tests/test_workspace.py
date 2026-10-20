@@ -181,5 +181,24 @@ class WorkspaceTests(unittest.TestCase):
         self.assertNotIn('private-input',evidence.text)
         self.assertNotIn('private-cookie',evidence.text)
 
+    def test_interaction_screenshots_are_served_without_exposing_run_files(self):
+        run = db.ROOT/'results'/'exploration_visual_test'
+        db.write(run/'report.json', {'persona':'Visitor', 'findings':[]})
+        db.write(run/'history.json', [{'step':1,'result':'executed',
+                 'decision':{'action':'fill'}, 'target_label':'Full name',
+                 'screenshots':{'before':'step-1-before.png','after':'step-1-after.png'}}])
+        (run/'evidence').mkdir()
+        Image.new('RGB', (40,30), 'white').save(run/'evidence'/'step-1-after.png')
+        db.write(run/'browser_state.json', {'cookies':['private-cookie']})
+        evidence = self.client.get('/api/reports/exploration_visual_test/evidence').json()[0]
+        self.assertEqual(evidence['target_label'], 'Full name')
+        self.assertNotIn('before', evidence['screenshots'])
+        image = self.client.get(evidence['screenshots']['after'])
+        self.assertEqual(image.status_code, 200)
+        self.assertEqual(image.headers['content-type'], 'image/png')
+        self.assertEqual(self.client.get('/api/reports/exploration_visual_test/evidence/browser_state.json').status_code, 404)
+        self.assertEqual(self.client.get('/api/reports/missing/evidence/step-1-after.png').status_code, 404)
+        self.assertEqual(self.client.get('/api/reports/exploration_visual_test').json()['actions_executed'], 1)
+
 if __name__=='__main__':
     unittest.main()

@@ -129,6 +129,25 @@ Local feedback focuses on the impression, a helpful aspect and an improvement;
 it does not generate a separate defect inventory. Missing or unsupported feedback
 is shown explicitly rather than presented as a successful zero-issue evaluation.
 
+Live reports summarize interactions performed, persona comments, helpful aspects,
+and suggested improvements. Evidence displays real before/after viewport PNGs
+captured during each browser action, with an amber outline on the target and
+password/file inputs masked. Click an image to open its full size. Capture failure
+does not discard interaction history. Older runs without PNGs show an explicit
+missing-screenshots message; screenshots are never reconstructed from DOM logs.
+Screen recording is not implemented yet. Screenshots are browser evidence only;
+the current local persona still chooses actions from live DOM observations.
+
+No feature template is required for a live task. Set the starting URL, select a
+persona, and enter a concrete action with a stopping condition in Task or
+instructions, for example: "Add Studio Headphones to the cart, confirm the item
+appears, then stop before checkout." Starting at the product/catalog page reduces
+navigation steps. The explicit task overrides the persona's default goal; persona
+traits determine the perspective. Same-site navigation and reversible add-to-cart
+actions are supported. Account submissions, payments and external navigation
+remain outside the current runner's scope. Select enough interactions for the
+route; the limit is not a guarantee of task completion.
+
 To avoid cloud API quotas, install [Ollama](https://ollama.com/download/windows)
 on Windows, download a local model once, and run:
 

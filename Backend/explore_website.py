@@ -115,7 +115,8 @@ def execute(page, decision, observation, handles, home):
         submit = element.evaluate('''el => !!el.form &&
             ((el.tagName === 'BUTTON' && el.type === 'submit') ||
              (el.tagName === 'INPUT' && ['submit','image'].includes(el.type)))''')
-        if submit and not re.search(r'\bsearch\b', control['name'], re.I):
+        reversible = re.search(r'\b(search|add\s+to\s+(?:cart|bag|basket))\b', control['name'], re.I)
+        if submit and not reversible:
             return 'blocked: form submission requires a dedicated test setup'
     if action == 'fill' and control['type'] in {'password', 'file', 'hidden'}:
         return 'blocked: credential/file input outside this exploration'

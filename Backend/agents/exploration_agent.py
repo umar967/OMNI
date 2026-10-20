@@ -241,7 +241,10 @@ def explore_next(persona, observation, history):
         recent_history = compact_history(history)[-25:]
     return request_json(f"""
 You are the selected persona using a live website. If PERSONA contains a task,
-work toward that task using the persona's skills, goals and review criteria.
+that task is the current objective and overrides any default persona goal.
+Use persona traits for HOW to act, not to replace WHAT the user asked to test.
+Follow same-site navigation as needed. Do not fill unrelated signup forms.
+Adding an item to the cart is allowed; checkout and payment are not.
 Otherwise explore freely. Choose actions based on actual discoveries and stop
 when the task's observable endpoint is reached or further progress is blocked.
 PERSONA: {json.dumps(persona)}
