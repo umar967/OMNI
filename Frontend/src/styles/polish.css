@@ -134,3 +134,20 @@ button.hero-secondary { background: transparent; border-color: transparent; colo
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
 }
+
+/* Evidence-led persona reports. */
+.experience-summary > p { font-size: 15px; line-height: 1.9; }
+.experience-summary > small { display: block; margin-top: 14px; }
+.journey-outcome { display: grid; grid-template-columns: 1fr 1.5fr; gap: 22px; padding: 20px; margin-top: 24px; border: 1px solid var(--line); background: var(--soft); border-radius: 12px; }
+.journey-outcome h3, .journey-outcome p { margin-top: 6px; font-size: 12px; }
+.journey-timeline { margin-top: 28px; }
+.journey-step { position: relative; padding: 0 0 30px 26px; margin-left: 14px; border-left: 1px solid var(--line); }
+.journey-step-heading { display: flex; align-items: center; gap: 14px; margin-left: -43px; }
+.journey-number { display: grid; place-items: center; background: var(--ink); color: var(--bg); border: 5px solid var(--panel); width: 34px; height: 34px; border-radius: 50%; flex-shrink: 0; font-size: 11px; }
+.journey-capture { margin: 22px 0 0; }
+.journey-capture figcaption { margin-bottom: 12px; overflow-wrap: anywhere; }
+.journey-capture figcaption strong { display: block; margin-bottom: 4px; }
+.journey-capture figcaption small { display: block; font-size: 11px; }
+.journey-capture .screen-preview { max-height: none; }
+.journey-capture:target { outline: 2px solid var(--accent); outline-offset: 5px; }
+@media (max-width: 750px) { .journey-outcome { grid-template-columns: 1fr; }.journey-step { padding-left: 16px; }.journey-step-heading { margin-left: -33px; } }

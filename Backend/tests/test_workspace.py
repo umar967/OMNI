@@ -80,6 +80,7 @@ class WorkspaceTests(unittest.TestCase):
         action = {'action':'scroll', 'target':-1, 'value':'down', 'reason':'Find help'}
         with patch('Backend.app.live.sync_playwright', return_value=browser_api), \
              patch('Backend.app.live.observe', return_value=(state, {})), \
+             patch('Backend.app.live.capture_step', side_effect=RuntimeError('capture unavailable')), \
              patch('Backend.app.live.execute', return_value='executed'), \
              patch('Backend.app.live.explore_next', side_effect=[action, GeminiRequestError('Gemini quota reached.')]), \
              patch('Backend.app.live.review_run') as review:

@@ -63,9 +63,12 @@ def run_live(item_id, plan, progress):
                         target = handles.get(decision.get('target'))
                         label = next((c['name'] for c in before['controls'] if c['id'] == decision.get('target')), '')
                         images = {}
+                        capture_metadata = {}
                         for phase in ('before',):
                             try:
-                                images[phase] = capture_step(page, folder, step, phase, target)
+                                capture_metadata[phase] = {'elapsed_seconds': round(time.monotonic()-started, 2)}
+                                images[phase] = capture_step(page, folder, step, phase, target, capture_metadata[phase])
+                                capture_metadata[phase]['elapsed_seconds'] = round(time.monotonic()-started, 2)
                             except Exception:
                                 progress(item_id, f'Step {step}: screenshot capture unavailable; interaction evidence will still be saved.')
                         result, error = 'agent_stopped', None
@@ -76,7 +79,9 @@ def run_live(item_id, plan, progress):
                                 result, error = 'automation_error', 'Browser action could not be completed.'
                         page.wait_for_timeout(1000)
                         try:
-                            images['after'] = capture_step(page, folder, step, 'after', target)
+                            capture_metadata['after'] = {}
+                            images['after'] = capture_step(page, folder, step, 'after', target, capture_metadata['after'])
+                            capture_metadata['after']['elapsed_seconds'] = round(time.monotonic()-started, 2)
                         except Exception:
                             progress(item_id, f'Step {step}: after screenshot unavailable.')
                         after, after_handles = observe(page)
@@ -84,7 +89,7 @@ def run_live(item_id, plan, progress):
                         history.append(dict(step=step, elapsed_seconds=round(time.monotonic()-started, 2),
                                             before=before, after=after, decision=decision, result=result,
                                             automation_error=error,
-                                            screenshots=images, target_label=label,
+                                            screenshots=images, capture_metadata=capture_metadata, target_label=label,
                                             observed_change={k: before[k] != after[k] for k in before}))
                         db.write(folder / 'history.json', history)
                         report['actions_recorded'] = len(history)

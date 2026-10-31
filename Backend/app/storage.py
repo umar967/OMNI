@@ -6,6 +6,7 @@ import threading
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
+from .journey import journey_summary
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.getenv('OMNI_DATA_DIR', DEFAULT_ROOT)).resolve()
@@ -70,11 +71,14 @@ def reports():
             report.setdefault('task','Explore the website')
             history_path=p.parent/'history.json'
             report['has_history']=history_path.is_file()
+            history = []
             if history_path.is_file():
                 history=read(history_path)
                 report['actions_executed'] = sum(row.get('result') == 'executed' for row in history)
                 if history:
                     report.setdefault('url',history[0].get('before',{}).get('url'))
+            report['journey_summary'] = journey_summary(report, history)
+            report['summary'] = (report.get('experience_summary') or {}).get('comment') or report['journey_summary']['text']
             snapshot=p.parent/'persona.json'
             if snapshot.is_file():
                 report['persona_snapshot']=read(snapshot)
@@ -95,11 +99,11 @@ def report_evidence(item_id):
         states={}
         for key in ('before','after'):
             source=row.get(key,{})
-            states[key]={'url':source.get('url'), 'visible_text':source.get('visible_text',''), 'controls':[{'id':c.get('id'),'name':c.get('name','')} for c in source.get('controls',[])]}
+            states[key]={'url':source.get('url'), 'title':source.get('title'), 'visible_text':source.get('visible_text',''), 'controls':[{'id':c.get('id'),'name':c.get('name','')} for c in source.get('controls',[])]}
         images = {}
         for phase in ('before', 'after'):
             filename = f'step-{row.get("step")}-{phase}.png'
             if row.get('screenshots', {}).get(phase) == filename and (path.parent/'evidence'/filename).is_file():
                 images[phase] = f'/api/reports/{item_id}/evidence/{filename}'
-        rows.append(dict(states,step=row.get('step'),action=decision.get('action'),reason=decision.get('reason'),result=row.get('result'),observed_change=row.get('observed_change',{}),screenshots=images,target_label=row.get('target_label','')))
+        rows.append(dict(states,step=row.get('step'),elapsed_seconds=row.get('elapsed_seconds'),capture_metadata=row.get('capture_metadata',{}),action=decision.get('action'),reason=decision.get('reason'),result=row.get('result'),observed_change=row.get('observed_change',{}),screenshots=images,target_label=row.get('target_label','')))
     return rows

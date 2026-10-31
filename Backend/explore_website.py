@@ -66,7 +66,7 @@ def observe(page):
         }
         return chunks.join('\\n');
     }''')
-    return {'url': page.url, 'visible_text': text, 'controls': controls,
+    return {'url': page.url, 'title': page.title(), 'visible_text': text, 'controls': controls,
             'scroll': page.evaluate('() => ({x: scrollX, y: scrollY, height: document.documentElement.scrollHeight})')}, handles
 
 

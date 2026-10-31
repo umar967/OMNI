@@ -45,14 +45,19 @@ function findings(r) {
     <small>${esc(f.category || "Candidate observation")} · OM-${i + 1}${f.steps?.length ? ` · Steps ${esc(f.steps.join(", "))}` : ""}</small>
     <h3>${esc(f.issue)}</h3><p class="muted">${esc(f.explanation || f.potential_persona_impact || "")}</p>
     <p class="spacer"><strong>Recorded evidence</strong><br>${esc(f.evidence)}</p>
-    <div class="hint spacer"><strong>Recommendation</strong><br>${esc(f.recommendation)}</div>
+
     ${btn("Inspect evidence →", "report-tab", "link spacer", "Evidence")}</article>`).join("");
+}
+
+function recommendations(r) {
+  const items = r.findings.map((f, i) => ({ ...f, number: i + 1 })).filter(f => f.recommendation);
+  return items.length ? `<section class="spacer"><h2>Recommendations</h2>${items.map(f => `<div class="hint spacer"><strong>OM-${f.number} · ${esc(f.issue)}</strong><p>${esc(f.recommendation)}</p></div>`).join("")}</section>` : "";
 }
 
 function feedback(r) {
   const data = r.persona_feedback;
   if (!data) return exploration(r) ? `<div class="hint warning spacer"><strong>Persona feedback is unavailable</strong><p>${esc(r.review_error || r.stop_reason || "The model review did not finish.")}</p><p>${r.actions_recorded || 0} actions were recorded. Open Evidence to inspect them. No usability verdict was produced.</p></div>` : "";
-  return `<section class="spacer"><h2>Persona experience</h2><p class="muted spacer">${esc(r.feedback_note || "AI-inferred reactions from recorded interactions, not measured human feelings.")}</p>
+  return `<section class="spacer"><h2>Persona reflections</h2><p class="muted spacer">${esc(r.feedback_note || "AI-inferred reactions from recorded interactions, not measured human feelings.")}</p>
     ${[["Overall impression", data.overall_impression ? [data.overall_impression] : []], ["What worked well", data.what_worked_well], ["Difficult moments", data.difficult_moments], ["Suggested improvements", data.suggested_improvements]].map(([label, items]) =>
       items?.length ? `<div class="finding"><h3>${label}</h3>${items.map((item) => `<p class="spacer">${esc(item.comment)}</p><small>Steps ${esc((item.steps || []).join(", "))} · ${esc(item.evidence)}</small>`).join("")}</div>` : "").join("")}</section>`;
 }
@@ -66,15 +71,43 @@ function scope(r) {
     ${r.coverage_gaps?.length ? `<div class="hint spacer"><strong>Coverage gaps</strong>${r.coverage_gaps.map((g) => `<p>${esc(g)}</p>`).join("")}</div>` : ""}`;
 }
 
+const elapsed = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0
+  ? `${Math.floor(value / 60).toString().padStart(2, "0")}:${Math.floor(value % 60).toString().padStart(2, "0")}` : "Time not recorded";
+
+function experienceSummary(r) {
+  if (!exploration(r)) return "";
+  const summary = r.experience_summary;
+  const trace = r.journey_summary;
+  return `<section class="experience-summary"><div class="sectionhead"><h2>Persona experience</h2><span class="badge">${summary ? "AI interpretation" : "Recorded journey"}</span></div>
+    <p>${esc(summary?.comment || trace?.text || "No execution summary is available for this report.")}</p>
+    ${summary ? `<small>Based on steps ${esc(summary.steps.join(", "))}. References are checked; the interpretation still needs human review.</small>` : ""}
+    <div class="journey-outcome"><div><small>Task outcome</small><h3>${esc(trace?.outcome || "Completion not verified")}</h3></div><div><small>Session ending</small><p>${esc(trace?.stop_reason || r.stop_reason || "Not recorded")}</p></div></div></section>`;
+}
+
 function evidence(r) {
   if (!exploration(r)) return `<h2>Evaluation screenshot</h2>${r.screenshot_id ? `<a href="${imageUrl(r.screenshot_id)}" target="_blank" rel="noopener"><img class="screen-preview evidence-full spacer" src="${imageUrl(r.screenshot_id)}" alt="Original evaluation screenshot"></a>` : empty("No screenshot was associated with this report.")}`;
-  const visual = state.evidence.filter((row) => Object.keys(row.screenshots || {}).length);
-  return `<h2>Persona interaction screenshots</h2><p class="muted spacer">Actual browser captures before and after each action. The amber outline marks the interaction target. Password fields are masked.</p>
-    ${!visual.length ? `<div class="hint spacer">This saved run has no interaction screenshots. Start a new session to capture them; earlier interactions cannot be reconstructed as screenshots.</div>` : visual.map((row) => `<article class="finding">
-      <div class="sectionhead"><h3>Step ${esc(row.step)} &middot; ${esc(row.action)}${row.target_label ? ` &middot; ${esc(row.target_label)}` : ""}</h3><span class="badge">${esc(row.result)}</span></div>
-      <p class="muted spacer">${esc(row.reason || "")}</p>
-      ${["before", "after"].map((phase) => row.screenshots[phase] ? `<figure class="spacer" style="margin-left:0;margin-right:0"><figcaption><strong>${phase === "before" ? "Before interaction" : "After interaction"}</strong></figcaption><a href="${esc(row.screenshots[phase])}" target="_blank" rel="noopener"><img class="screen-preview evidence-full spacer" style="width:100%;max-height:none" src="${esc(row.screenshots[phase])}" alt="Step ${esc(row.step)} ${phase}: ${esc(row.action)} ${esc(row.target_label || "")}" loading="lazy"></a></figure>` : "").join("")}
-    </article>`).join("")}`;
+  const seen = new Map();
+  return `<h2>Persona journey evidence</h2><p class="muted spacer">Recorded screens in execution order. Timestamps are elapsed session time, not human task time. Identical captures reference the earlier image; missing evidence stays visible.</p>
+    <div class="journey-timeline">${!state.evidence.length ? empty("No interaction trace is available for this run.") : state.evidence.map(row => {
+      const issues = (r.findings || []).map((f, i) => ({...f, number: i + 1})).filter(f => f.steps?.includes(row.step));
+      const captures = ["before", "after"].map(phase => {
+        const src = row.screenshots?.[phase];
+        const meta = row.capture_metadata?.[phase] || {};
+        const title = meta.title || row[phase]?.title || row[phase]?.url || "Page title not recorded";
+        if (!src) return `<div class="hint spacer">${phase === "before" ? "Before" : "After"} capture unavailable. This state cannot be reconstructed.</div>`;
+        const existing = meta.sha256 && seen.get(meta.sha256);
+        const id = `capture-${row.step}-${phase}`;
+        if (meta.sha256 && !existing) seen.set(meta.sha256, {id, step: row.step, phase});
+        const figure = `<figure class="journey-capture" id="${id}"><figcaption><strong>${esc(title)}</strong><small>${phase === "before" ? "Before action" : "After action"} · ${elapsed(meta.elapsed_seconds)} · ${esc(row[phase]?.url || meta.url || "URL not recorded")}</small></figcaption>
+          ${existing ? `<p class="hint">Identical to step ${esc(existing.step)} (${existing.phase}). <a href="#${existing.id}" data-capture-ref="${existing.id}">View earlier capture ↑</a></p>` : `<a href="${esc(src)}" target="_blank" rel="noopener"><img class="screen-preview evidence-full" src="${esc(src)}" alt="Step ${esc(row.step)}, ${phase} ${esc(row.action)}: ${esc(title)}" loading="lazy"></a>`}
+          ${meta.ready === false ? `<div class="hint warning spacer">Capture readiness was incomplete: ${esc(meta.pending_images ?? "unknown")} visible images unresolved${meta.busy ? "; loading indicators remained" : ""}${meta.fonts_ready === false ? "; fonts were still loading" : ""}. This is an evidence limitation, not a confirmed website issue.</div>` : !Object.hasOwn(meta, "ready") ? `<small>Loading readiness was not recorded for this capture.</small>` : ""}</figure>`;
+              return phase === "before" && row !== state.evidence[0] ? `<details class="spacer"><summary>Inspect state before this action</summary>${figure}</details>` : figure;
+      }).join("");
+      return `<article class="journey-step"><div class="journey-step-heading"><span class="journey-number">${esc(row.step)}</span><div><h3>${esc(row.action || "Recorded interaction")}${row.target_label ? ` · ${esc(row.target_label)}` : ""}</h3><small>${elapsed(row.elapsed_seconds)} · ${esc(row.result || "Result not recorded")}</small></div></div>
+        ${row.reason ? `<p class="muted spacer"><strong>Agent's stated intention:</strong> ${esc(row.reason)}</p>` : ""}
+        ${issues.length ? `<div class="hint spacer"><strong>Associated candidate issues</strong>${issues.map(f => `<p>OM-${f.number} · ${esc(f.issue)} <span class="badge">${esc(f.severity)}</span></p>`).join("")}</div>` : ""}
+        ${captures}</article>`;
+    }).join("")}</div>`;
 }
 
 export function report() {
@@ -95,11 +128,11 @@ export function report() {
     : "Saved screenshot evaluation. Findings are model observations, not confirmed functional test results.";
   return steps(3) + heading(exploration(r) ? "Exploration report" : r.task || "Evaluation report", `${r.persona} · ${r.method || "Screenshot UX evaluation"}`, btn("↓ Export report JSON", "export-report", "ghost")) + `
     <div class="hint">${intro}</div><div class="grid cols4 spacer">${metrics.map(([label, count]) => `<div class="panel stat"><small>${label}</small><strong>${esc(count)}</strong></div>`).join("")}</div>
-    <div class="tabs spacer">${[["Overview", "Overview"], [exploration(r) ? "Flow coverage" : "Review cases", "Review cases"], ["Evidence", "Evidence"]].map(([label, key]) => btn(label, "report-tab", key === state.reportTab ? "primary" : "ghost", key)).join("")}</div>
-    <div class="deck"><section class="panel">${state.reportTab === "Overview" ? `<h2>Recorded observations</h2>${feedback(r)}${!exploration(r) || r.findings.length ? findings(r) : ""}` : state.reportTab === "Review cases" ? scope(r) : evidence(r)}
+    <div class="tabs spacer">${(exploration(r) ? [["Experience & findings", "Overview"], ["Journey evidence", "Evidence"]] : [["Overview", "Overview"], ["Review cases", "Review cases"], ["Evidence", "Evidence"]]).map(([label, key]) => btn(label, "report-tab", key === state.reportTab ? "primary" : "ghost", key)).join("")}</div>
+    <div class="deck"><section class="panel">${state.reportTab === "Overview" ? `${experienceSummary(r)}${feedback(r)}<h2 class="spacer">Problems encountered</h2>${findings(r)}${recommendations(r)}` : state.reportTab === "Review cases" ? scope(r) : evidence(r)}
     ${r.limitations?.length ? `<details class="hint spacer"><summary>Recorded limitations</summary>${r.limitations.map((v) => `<p>${esc(v)}</p>`).join("")}</details>` : ""}</section>
-    <aside class="panel" style="align-self:start"><div class="eyebrow">Report context</div><h3>${esc(r.persona)}</h3>
-      ${[["URL", r.url || "Not recorded"], ["Mode", exploration(r) ? "Browser exploration" : "Screenshot UX"], ["Review", exploration(r) ? reviewLabel(r.review_status) : "Screenshot analysis"], ["Project", project?.name || "Ungrouped"], ["Model", r.model || "Not recorded"], ["Run date", r.imported ? "Not recorded" : date(r.created_at)]].map(([label, value]) => `<div class="listrow"><small>${label}</small><span class="context-value">${esc(value)}</span></div>`).join("")}
+    <aside class="panel" style="align-self:start"><div class="eyebrow">Persona overview</div><h3>${esc(r.persona)}</h3>
+      ${[["Goal", r.task || "Not recorded"], ["Technical familiarity", r.persona_snapshot?.technical_skill || r.persona_snapshot?.technical_level || "Not recorded"], ["URL", r.url || "Not recorded"], ["Mode", exploration(r) ? "Browser exploration" : "Screenshot UX"], ["Review", exploration(r) ? reviewLabel(r.review_status) : "Screenshot analysis"], ["Project", project?.name || "Ungrouped"], ["Model", r.model || "Not recorded"], ["Run date", r.imported ? "Not recorded" : date(r.created_at)]].map(([label, value]) => `<div class="listrow"><small>${label}</small><span class="context-value">${esc(value)}</span></div>`).join("")}
       ${link("← Reports Library", "reports", "ghost spacer")}${project ? link("Open project ↗", `project/${project.id}`, "ghost spacer") : ""}
     </aside></div>`;
 }

@@ -181,6 +181,17 @@ async function busy(action) {
   }
 }
 document.addEventListener("click", (event) => {
+  const captureLink = event.target.closest("[data-capture-ref]");
+  if (captureLink) {
+    event.preventDefault();
+    const target = document.getElementById(captureLink.dataset.captureRef);
+    const disclosure = target?.closest("details");
+    if (disclosure) disclosure.open = true;
+    target?.scrollIntoView({ block: "center" });
+    target?.setAttribute("tabindex", "-1");
+    target?.focus({ preventScroll: true });
+    return;
+  }
   const button = event.target.closest("[data-action]");
   if (!button) return;
   const action = button.dataset.action,
