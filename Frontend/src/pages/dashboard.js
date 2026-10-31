@@ -1,37 +1,27 @@
-/** Dashboard intentionally preserves the prototype's illustrative statistics. */
 import { state } from "../state.js";
-import { heading, landscape, link } from "../components/ui.js";
+import { heading, link, empty } from "../components/ui.js";
+import { reportRows } from "./reports.js";
+
 export function dashboard() {
-  return (
-    heading(
-      `A clearer perspective, ${state.preferences.name}.`,
-      "A little clarity for everything you're building.",
-      link("＋ New test", "deck", "primary"),
-    ) +
-    `<section class="hero">${landscape}<span class="season">A MOMENT OF CLARITY / 01</span><div class="heroText"><div class="eyebrow" style="color:#eef1e2">Thoughtful testing. Human perspective.</div><h1>Build with confidence.<br>See through their eyes.</h1><p>One space to understand how your website really feels.</p>${link("Start an exploration ↗", "deck")}</div></section><div class="grid cols4 spacer">${[
-      ["Explorations", "24", "↑ 4 this week"],
-      ["Average quality", "84", "out of 100"],
-      ["Issues discovered", "18", "Across QA & UX"],
-      ["Your personas", "3", "Different perspectives"],
-    ]
-      .map(
-        ([t, n, s]) =>
-          `<div class="panel stat"><small>${t}</small><strong>${n}</strong><small>${s}</small></div>`,
-      )
-      .join(
-        "",
-      )}</div><div class="grid cols3 spacer"><section class="panel"><div class="sectionhead"><h3>Test outcomes</h3><small>Sample · last 30 days</small></div><div class="row"><div class="donut"><strong>78<small>%</small></strong></div><div class="legend"><span class="dot"></span>Passed · 78%<br><span class="dot" style="background:#d6dfcf"></span>Review · 14%<br><span class="dot" style="background:#cda893"></span>Failed · 8%</div></div></section><section class="panel"><div class="sectionhead"><h3>Issues by severity</h3><small>18 total</small></div>${[
-      ["Critical", 2, 17],
-      ["High", 5, 42],
-      ["Medium", 8, 67],
-      ["Low", 3, 25],
-    ]
-      .map(
-        ([t, n, w]) =>
-          `<div class="row" style="justify-content:space-between;font-size:11px"><span>${t}</span><span>${n}</span></div><div class="bar"><span style="width:${w}%"></span></div>`,
-      )
-      .join(
-        "",
-      )}</section><section class="panel"><div class="sectionhead"><h3>Pick up where you left off</h3></div><div class="projecticon">↗</div><h3>Evergreen Store</h3><p class="muted spacer">Sample dashboard card. Open your real reports to continue.</p>${link("View your reports →", "reports", "ghost spacer")}</section></div><section class="panel spacer"><div class="sectionhead"><h3>Recent explorations <small>· Sample data</small></h3>${link("Your real reports ↗", "reports", "link")}</div><div class="listrow"><div class="row"><span class="avatar">↗</span><div><h3>Evergreen Store</h3><small>Combined · Oct 19, 2026 · Maya Chen</small></div></div><span class="badge">84/100 · Sample</span></div></section>`
-  );
+  const reports = state.reports;
+  const recent = [...reports].sort((a, b) => (Date.parse(b.created_at) || 0) - (Date.parse(a.created_at) || 0)).slice(0, 3);
+  const metrics = [
+    ["Saved reports", reports.length, "Your recorded evaluations", "01"],
+    ["Browser explorations", reports.filter(r => r.kind === "exploration").length, "Sessions with saved reports", "02"],
+    ["Projects", state.projects.length, "Organized in your workspace", "03"],
+    ["Available personas", state.personas.length, "Perspectives to explore", "04"],
+  ];
+  return heading(`Welcome back, ${state.preferences.name}.`, "A fresh perspective on what you're building.", link("＋ New exploration", "deck", "primary")) + `
+    <section class="perspective-hero">
+      <div class="hero-copy"><div class="eyebrow">THE HUMAN SIDE OF YOUR WEBSITE</div>
+        <h2>Good experiences start<br>with a different perspective.</h2>
+        <p>Explore your website through AI personas.<br>Follow their actions. Discover what needs a closer look.</p>
+        <div class="hero-actions">${link('Start an exploration <span aria-hidden="true">↗</span>', "deck", "hero-cta")}${link("Meet your personas →", "personas", "hero-secondary")}</div>
+        <div class="hero-caption"><span class="pulse"></span> Your next insight starts with a question.</div>
+      </div>
+      <div class="perspective-art" aria-hidden="true"><div class="orbit orbit-one"></div><div class="orbit orbit-two"></div><div class="orbit orbit-three"></div><div class="orbit-core">o<span>m</span>ni</div><span class="orbit-label label-one">Observe</span><span class="orbit-label label-two">Explore</span><span class="orbit-label label-three">Understand</span><span class="art-coordinate">A CHANGE IN PERSPECTIVE / OMNI</span></div>
+    </section>
+    <div class="grid cols4 spacer workspace-metrics">${metrics.map(([label, value, caption, number]) => `<section class="panel stat"><div class="sectionhead"><small>${label}</small><span class="metric-index">${number}</span></div><strong>${value}</strong><small>${caption}</small></section>`).join("")}</div>
+    <div class="overview-bottom spacer"><section class="panel recent-panel"><div class="sectionhead"><div><div class="eyebrow">YOUR WORK, IN FOCUS</div><h2>Recent reports</h2></div>${link("View all ↗", "reports", "link")}</div>${recent.length ? reportRows(recent) : empty("Your first perspective is waiting. Run an exploration to see its report here.", link("Create an exploration →", "deck", "primary"))}</section>
+    <section class="panel perspective-note"><div class="eyebrow">A THOUGHTFUL START</div><span class="note-symbol" aria-hidden="true">✳</span><h2>One task.<br>A new point of view.</h2><p>Choose a focused task and a persona. Review the recorded evidence before drawing conclusions.</p><div class="note-footer">AI perspectives are hypotheses,<br>not a substitute for real user research.</div>${link("Explore persona library ↗", "personas", "link")}</section></div>`;
 }

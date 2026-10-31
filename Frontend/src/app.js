@@ -57,6 +57,9 @@ function draw({ preserveScroll = true } = {}) {
         ? onboarding()
         : layout((views[page] || dashboard)(), page);
   restoreScroll?.();
+  if (!preserveScroll) {
+    $(".content")?.classList.add("page-enter");
+  }
 }
 function redrawKeepingFormValues() {
   const drafts = [...document.forms].map((form) =>

@@ -9,6 +9,6 @@ The dusk UI is a buildless ES-module application served by the backend at http:/
 - `src/pages/`: dashboard, projects, personas, testing, reports, settings and local welcome
 - `src/styles/`: original design tokens and connected-screen styles
 
-Only `pages/dashboard.js` contains illustrative records. Every other data screen reads the Python API. API failure never falls back to sample results.
+All data screens, including overview counts and recent reports, read the Python API. API failure never falls back to sample results. The visual system in `src/styles/polish.css` extends the original sage palette with responsive layouts, light/dark surfaces and reduced-motion-aware transitions. Page entrances run on navigation, not during execution polling.
 
 Run `npm.cmd run check` for JavaScript syntax checks. Start the complete app from the repository root using `./start.ps1`.
