@@ -12,6 +12,9 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from PIL import Image
+from pydantic import ValidationError
+from Backend.persona_engine.schema import UniversalPersona
+from Backend.persona_engine.resolver import compatibility_record, resolve_persona, agent_persona, SKILLS
 
 from Backend.agents.persona_agent import evaluate_ux
 from . import storage as db
@@ -79,16 +82,41 @@ def health():
 def list_personas():
     return db.personas()
 
+@app.get('/api/personas/schema')
+def persona_schema():
+    """The future builder uses this schema, including nested defaults and enums."""
+    return UniversalPersona.model_json_schema()
+
+@app.post('/api/personas/validate')
+def validate_persona(body:UniversalPersona | PersonaInput):
+    item = persona_record(body, None)
+    return resolve_persona(item).model_dump()
+
+def persona_record(body, item_id, existing=None):
+    try:
+        if isinstance(body, UniversalPersona):
+            return compatibility_record(body.model_dump(), item_id)
+        fields = body.model_dump()
+        if existing:
+            canonical = resolve_persona(existing).persona.model_dump()
+            canonical['profile'].update(name=fields['name'],
+                technical_experience=SKILLS.get(fields['technical_skill'], fields['technical_skill']))
+            canonical['profile']['task_context'].update(default_goal=fields['goal'], criteria=fields['criteria'])
+            return compatibility_record({**existing, **fields, 'universal_persona': canonical}, item_id)
+        return compatibility_record(fields, item_id)
+    except (ValidationError, ValueError) as exc:
+        raise HTTPException(422, str(exc))
+
 @app.post('/api/personas', status_code=201)
-def create_persona(body:PersonaInput):
-    item = dict(body.model_dump(), id=db.identifier())
+def create_persona(body:UniversalPersona | PersonaInput):
+    item = persona_record(body, db.identifier())
     db.write(db.safe_file('personas',item['id']),item)
     return item
 
 @app.put('/api/personas/{item_id}')
-def update_persona(item_id:str, body:PersonaInput):
+def update_persona(item_id:str, body:UniversalPersona | PersonaInput):
     existing = get_record('personas',item_id)
-    item = dict(existing, **body.model_dump())
+    item = persona_record(body, item_id, existing)
     db.save_persona(item_id,item)
     return item
 
@@ -229,7 +257,7 @@ def evaluate_run(item_id,plan):
         selected = [c for c in plan['cases'] if c['selected']]
         task = plan['instructions']+'\n\nSelected screenshot review criteria:\n'+'\n'.join(c['title']+': '+c['expected'] for c in selected)
         progress(item_id,'Sent screenshot to Gemini. Waiting for evidence-based findings.',stage='analyzing')
-        result = evaluate_ux(plan['persona'],task,path)
+        result = evaluate_ux(agent_persona(plan['persona'], plan['instructions']),task,path)
         result.update(id=item_id,run_id=item_id,created_at=db.now(),persona_id=plan['persona_id'],persona_snapshot=plan['persona'],task=plan['instructions'],url=plan['url'],mode='UX',project_id=plan['project_id'],screenshot_id=plan['screenshot_id'],cases=selected,model=os.getenv('GEMINI_MODEL','gemini-3.8-flash'),method='Gemini screenshot UX evaluation')
         db.write(db.safe_file('results',item_id),result)
         progress(item_id,'Findings saved. Report is ready.',status='completed',stage='completed',report_id=item_id)
@@ -243,6 +271,12 @@ def evaluate_run(item_id,plan):
 @app.post('/api/runs',status_code=202)
 def create_run(body:RunInput):
     plan = get_record('plans',body.plan_id)
+    try:
+        runtime = resolve_persona(plan['persona'], plan['instructions'])
+        if plan.get('method') == 'live':
+            runtime.require_supported()
+    except (ValueError, ValidationError) as exc:
+        raise HTTPException(422, str(exc))
     if not any(c['selected'] for c in plan['cases']):
         raise HTTPException(400,'Select at least one review case.')
     needs_gemini = plan.get('method') != 'live' or os.getenv('OMNI_MODEL_PROVIDER', 'gemini').lower() != 'ollama'

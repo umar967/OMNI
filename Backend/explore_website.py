@@ -10,6 +10,7 @@ from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
 from Backend.flow_coverage import assess_flows
 from Backend.agents.gemini_requests import ModelRequestError
+from Backend.persona_engine.resolver import resolve_persona, agent_persona
 
 ROOT = Path(__file__).resolve().parent
 SELECTOR = ('button, a[href], input:not([type="hidden"]), textarea, select, '
@@ -228,6 +229,11 @@ def main():
             parser.error('Cannot resume: missing ' + ', '.join(missing))
 
         persona = json.loads((run_dir / 'persona.json').read_text(encoding='utf-8'))
+        # New snapshots retain the canonical configuration; old snapshots still migrate.
+        if 'runtime_profile' in persona:
+            persona = persona['runtime_profile']['persona']
+        resolve_persona(persona).require_supported()
+        persona = agent_persona(persona)
         catalog = json.loads((run_dir / 'flow_catalog.json').read_text(encoding='utf-8'))
         history = json.loads((run_dir / 'history.json').read_text(encoding='utf-8'))
         previous_report = json.loads((run_dir / 'report.json').read_text(encoding='utf-8'))
@@ -248,7 +254,9 @@ def main():
             'exploration_' + datetime.now().strftime('%Y%m%d_%H%M%S_%f')
         )
         run_dir.mkdir(parents=True)
-        save(run_dir / 'persona.json', persona)
+        runtime = resolve_persona(persona).require_supported()
+        persona = agent_persona(persona)
+        save(run_dir / 'persona.json', dict(persona, runtime_profile=runtime.model_dump()))
         save(run_dir / 'flow_catalog.json', catalog)
         history, events = [], []
         save(run_dir / 'report.json', {

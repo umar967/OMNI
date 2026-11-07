@@ -1,4 +1,4 @@
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -9,6 +9,8 @@ def valid_url(value):
     return value
 
 class PersonaInput(BaseModel):
+    # Legacy request adapter only; all accepted values also enter UniversalPersona.
+    model_config = ConfigDict(extra='forbid')
     name: str = Field(min_length=1, max_length=100)
     technical_skill: str = Field(default='moderate', max_length=50)
     goal: str = Field(min_length=1, max_length=2000)

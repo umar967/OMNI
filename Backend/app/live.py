@@ -9,14 +9,16 @@ from Backend.agents.exploration_agent import explore_next, review_run, clean_rev
 from Backend.agents.gemini_requests import ModelRequestError
 from . import storage as db
 from .visual_evidence import capture_step
+from Backend.persona_engine.resolver import resolve_persona, agent_persona
 
 
 def run_live(item_id, plan, progress):
     folder = db.directory('results') / ('exploration_' + item_id)
     folder.mkdir(parents=True, exist_ok=True)
-    persona = dict(plan['persona'], task=plan['instructions'],
+    runtime = resolve_persona(plan['persona'], plan['instructions']).require_supported()
+    persona = dict(agent_persona(plan['persona'], plan['instructions']),
                    review_criteria=[c for c in plan['cases'] if c['selected']])
-    db.write(folder / 'persona.json', persona)
+    db.write(folder / 'persona.json', dict(persona, runtime_profile=runtime.model_dump()))
     history = []
     report = dict(persona=persona['name'], run_id=item_id, created_at=db.now(),
                   task=plan['instructions'], url=plan['url'], project_id=plan['project_id'],

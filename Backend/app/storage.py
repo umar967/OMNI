@@ -7,6 +7,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from .journey import journey_summary
+from Backend.persona_engine.resolver import compatibility_record
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.getenv('OMNI_DATA_DIR', DEFAULT_ROOT)).resolve()
@@ -43,7 +44,8 @@ def records(folder):
         return [dict(read(p), id=p.stem) for p in sorted(directory(folder).glob('*.json'))]
 
 def personas():
-    return [dict(p, technical_skill=p.get('technical_skill', p.get('technical_level', 'moderate'))) for p in records('personas')]
+    return [compatibility_record({k: v for k, v in p.items() if k != 'id'}, p['id'])
+            for p in records('personas')]
 
 def persona(item_id):
     safe_file('personas',item_id)

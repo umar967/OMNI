@@ -1,0 +1,19 @@
+{
+  "schema_version": "1.0",
+  "profile": {
+    "name": "Power User",
+    "description": "A technically experienced visitor encountering this website for the first time. A scenario profile, not a measured human population.",
+    "technical_experience": "advanced",
+    "website_familiarity": "first_visit",
+    "task_context": {
+      "default_goal": "Explore the website and review visible navigation and feedback without crossing execution boundaries.",
+      "criteria": ["Navigation clarity", "Search and filter discoverability", "Action feedback", "Error recovery"]
+    }
+  },
+  "calibration": [],
+  "provenance": {
+    "origin": "built_in",
+    "source": "OMNI curated scenario preset",
+    "notes": ["Descriptive assumptions only; no human calibration or behavioral simulation."]
+  }
+}

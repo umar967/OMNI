@@ -245,6 +245,15 @@ and disabled controls, and dialogs. It makes no model or network requests.
 Set `OMNI_TEST_BROWSER_CHANNEL` to another installed Playwright browser channel
 if needed (an empty value uses bundled Chromium).
 
+### Universal Persona Foundation (Milestone 3)
+
+Built-in and custom personas now share a versioned Pydantic schema and resolver.
+The existing persona API and frontend remain compatible; structured requests are
+also accepted. `GET /api/personas/schema` supplies the future builder contract,
+and `POST /api/personas/validate` returns normalization and capability diagnostics.
+See [the foundation contracts and compatibility guide](Backend/persona_engine/README.md).
+This milestone adds no behavioral simulation or fitted human calibration.
+
 ## Separate OMNI-TestLab folder
 
 OMNI-TestLab lives outside this repository, for example at `D:\FYP\OMNI-TestLab`.

@@ -6,11 +6,13 @@ from pathlib import Path
 from dotenv import load_dotenv
 from Backend.agents.gemini_requests import generate_json
 from google.genai import types
+from Backend.persona_engine.resolver import agent_persona
 
 ROOT = Path(__file__).resolve().parents[1]
 load_dotenv(ROOT / '.env')
 
 def evaluate_ux(persona, task, screenshot_path):
+    persona = agent_persona(persona)
     key = os.getenv('GEMINI_API_KEY')
     if not key:
         raise RuntimeError('GEMINI_API_KEY is not configured. Add it to Backend/.env and restart the server.')

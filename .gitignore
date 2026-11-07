@@ -28,3 +28,4 @@ Backend/screenshots/*.jpeg
 Backend/personas/*.json
 !Backend/personas/older_user.json
 !Backend/personas/first_time_user.json
+!Backend/personas/power_user.json
