@@ -315,7 +315,8 @@ class RunnerJournalTests(unittest.TestCase):
             atomic_json(root/'flows.json', {'flows':[]})
             api = MagicMock()
             stack.enter_context(patch.object(module, 'sync_playwright', api))
-            state = {'url':'https://shop.test/', 'visible_text':'Details', 'controls':[]}
+            state = {'url':'https://shop.test/', 'visible_text':'Details',
+                     'controls':[{'id':0, 'tag':'button', 'type':'button', 'name':'Details', 'disabled':False}]}
             observed = Mock(return_value=(state, {}))
             if failure == 'after_observation':
                 observed.side_effect = [(state, {}), RuntimeError('closed browser')]

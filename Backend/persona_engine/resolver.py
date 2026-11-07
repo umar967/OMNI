@@ -38,7 +38,7 @@ class CapabilityIssue(Contract):
 
 class EngineParameters(Contract):
     version: Literal['foundation-1'] = 'foundation-1'
-    policy_mode: Literal['legacy_passthrough'] = 'legacy_passthrough'
+    policy_mode: Literal['legacy_passthrough', 'neutral_passthrough', 'provisional_pilot_v1'] = 'legacy_passthrough'
     parameter_status: Literal['provisional'] = 'provisional'
     behavioral_simulation_enabled: Literal[False] = False
     # No client-supplied artifact is trusted or activated by this foundation.
@@ -89,7 +89,7 @@ def resolve_persona(data, task=None):
         raise ValueError('Task override must be nonblank text of at most 10000 characters.')
     return RuntimeProfile(persona=persona, task=task.strip() if task else profile.task_context.default_goal,
                           unsupported_capabilities=issues,
-                          warnings=['Attention, navigation and recovery settings are descriptive only in Milestone 3.',
+                          warnings=['Attention activation depends on the session perception policy; navigation and recovery remain descriptive.',
                                     'Calibration references are declarations, not verified or active human calibration.'])
 
 
@@ -112,6 +112,16 @@ def compatibility_record(data, item_id=None):
 
 def agent_persona(data, task=None):
     """Legacy prompt projection; internal contracts must not activate policies by prompt."""
+    if isinstance(data, RuntimeProfile):
+        p = data.persona.profile
+        result = {'name':p.name, 'description':p.description,
+                  'technical_skill':{'beginner':'basic','intermediate':'moderate','advanced':'advanced'}[p.technical_experience],
+                  'website_familiarity':p.website_familiarity,
+                  'goal':p.task_context.default_goal or 'Explore the website', 'criteria':list(p.task_context.criteria),
+                  'behavior_preferences':list(p.navigation.notes)}
+        if task or data.task:
+            result['task'] = task or data.task
+        return result
     runtime = resolve_persona(data, task)
     result = compatibility_record(data)
     result.pop('universal_persona', None)

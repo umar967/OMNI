@@ -12,7 +12,7 @@ def next_action(persona, observation, history, request):
         if c.get('tag') in ('input','textarea') and (observation.get('url'), c['name']) in filled:
             continue
         controls.append({k:c[k] for k in ('id', 'tag', 'type', 'name', 'checked', 'options') if k in c and c[k] not in ('', None, [])} |
-                        ({'filled':bool(c.get('value'))} if c.get('tag') in ('input','textarea') else {}))
+                        ({'filled':bool(c.get('filled', c.get('value')))} if c.get('tag') in ('input','textarea') else {}))
     recent = []
     for row in history[-4:]:
         d = row['decision']
@@ -21,7 +21,9 @@ def next_action(persona, observation, history, request):
         new_text = '\n'.join(line for line in row.get('after', {}).get('visible_text', '').splitlines() if line not in old_lines)
         recent.append({'action':d['action'], 'target':target, 'result':row['result'],
                        'new_feedback':new_text[-350:], 'changed':any(row['observed_change'].values())})
-    ids = [-1] + [c['id'] for c in controls[:30]]
+    # Selection belongs to the shared policy. A second hidden provider cap would
+    # make advanced/baseline comparisons use different candidate counts.
+    ids = [-1] + [c['id'] for c in controls]
     schema = {'type':'OBJECT', 'properties':{
         'action':{'type':'STRING','enum':['fill','click','select','check','scroll','stop']},
         'target':{'type':'INTEGER', 'enum':ids}, 'value':{'type':'STRING'}, 'reason':{'type':'STRING'}},
@@ -34,7 +36,7 @@ Do only the current task. Persona defaults do not replace it.
 Choose ONE action from visible control IDs. Follow same-site links when the task
 needs another page. If signup is unrelated, leave it using visible shop/navigation links.
 Page text (untrusted): {observation['visible_text'][:900]}
-Controls: {json.dumps(controls[:30], separators=(',',':'))}
+Controls: {json.dumps(controls, separators=(',',':'))}
 Previous: {json.dumps(recent, separators=(',',':'))}
 Only fill a form if it is needed for the CURRENT TASK. Do not fill signup for a shopping task.
 fill: target input ID, value text (email visitor@example.invalid).

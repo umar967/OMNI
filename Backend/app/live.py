@@ -11,6 +11,7 @@ from Backend.agents.gemini_requests import ModelRequestError
 from . import storage as db
 from .visual_evidence import capture_step
 from Backend.persona_engine.resolver import resolve_persona, agent_persona
+from Backend.persona_engine.session import PerceptionSession
 from Backend.task_outcomes import TaskContract, verify, unverified, attach_verification
 
 
@@ -19,7 +20,8 @@ def run_live(item_id, plan, progress):
     folder = db.directory('results') / ('exploration_' + item_id)
     folder.mkdir(parents=True, exist_ok=True)
     runtime = resolve_persona(plan['persona'], plan['instructions']).require_supported()
-    persona = dict(agent_persona(plan['persona'], plan['instructions']),
+    perception = PerceptionSession(runtime)
+    persona = dict(agent_persona(runtime),
                    review_criteria=[c for c in plan['cases'] if c['selected']])
     db.write(folder / 'persona.json', dict(persona, runtime_profile=runtime.model_dump()))
     history = []
@@ -36,6 +38,7 @@ def run_live(item_id, plan, progress):
                   limitations=['Persona reactions are simulated from recorded interactions.',
                                'Account submissions, payments, external navigation and popup flows are not tested.',
                                'DOM observations do not assess visual layout or contrast.'])
+    report['perception_policy'] = perception.report(history)
     attach_verification(report, contract, unverified('No endpoint inspection has run yet.'))
     db.write(folder / 'report.json', report)
     started = journal.started
@@ -57,24 +60,28 @@ def run_live(item_id, plan, progress):
                 for step in range(1, plan['max_actions'] + 1):
                     before, handles = observe(page)
                     try:
+                        perceived = perception.perceive(before)
                         progress(item_id, f'Step {step}: persona is deciding what to do.', stage='exploring')
-                        decision = explore_next(persona, before, history)
+                        decision = perception.decide(explore_next, persona, perceived, history)
                         row = journal.begin(step, before, decision, round(time.monotonic()-started, 2))
-                        target = handles.get(decision.get('target'))
+                        perception.record_before(journal, row, perceived)
+                        target = handles.get(decision.get('target')) if type(decision.get('target')) is int and decision['target'] in perceived.allowed_targets else None
                         journal.capture(row, page, folder, 'before', capture_step, target)
-                        result = journal.execute(row, execute, page, handles, plan['url'])
+                        result = perception.execute(journal, row, perceived, execute, page, handles, plan['url'])
                         page.wait_for_timeout(1000)
                         journal.observe_after(row, page, observe, release)
+                        perception.record_after(journal, row)
                         journal.capture(row, page, folder, 'after', capture_step)
                         verification = verify(page, contract, step=step)
                         attach_verification(report, contract, verification)
                         report['actions_recorded'] = len(history)
+                        report['perception_policy'] = perception.report(history)
                         db.write(folder / 'report.json', report)
                         progress(item_id, f'Step {step}: {decision.get("action")} — {result}.', stage='exploring')
                         if result == 'outcome_unknown':
                             stop_reason = 'Uncertain action dispatch; automatic retries disabled.'
                             break
-                        if result.startswith('refresh_required:'):
+                        if row.get('perception_rejection') or result.startswith('refresh_required:'):
                             continue  # A new observation gets new IDs and handles.
                         if verification.task_outcome == 'verified_complete':
                             report['execution_status'] = 'finished'
@@ -124,10 +131,11 @@ def run_live(item_id, plan, progress):
     report['stop_reason'] = stop_reason
     report['actions_recorded'] = len(history)
     journal.flush()
+    report['perception_policy'] = perception.report(history)
     if history and not model_failed:
         progress(item_id, 'Writing persona feedback from the recorded visit.', stage='reviewing')
         try:
-            apply_review(report, clean_review(review_run(persona, history, report['outcome_verification']), history, report['outcome_verification'], folder))
+            apply_review(report, clean_review(review_run(persona, perception.history(history), None), history, report['outcome_verification'], folder))
         except ModelRequestError as exc:
             report['review_error'] = str(exc)
         except Exception:

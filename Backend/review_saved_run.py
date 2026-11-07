@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 
 from Backend.agents.exploration_agent import apply_review, clean_review, review_run
+from Backend.persona_engine.perception_v1 import project_history
 
 
 def main():
@@ -29,7 +30,8 @@ def main():
     report['actions_recorded'] = len(history)
     print(f"Reviewing {len(history)} saved actions with {args.provider}...", flush=True)
     try:
-        review = clean_review(review_run(persona, history, report.get('outcome_verification')), history, report.get('outcome_verification'), args.run)
+        projected = project_history(history, (report.get('perception_policy') or {}).get('policy_key'))
+        review = clean_review(review_run(persona, projected, None), history, report.get('outcome_verification'), args.run)
     except Exception as exc:
         report['review_status'] = 'unavailable'
         report['review_error'] = str(exc)

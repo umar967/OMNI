@@ -103,6 +103,19 @@ function scope(r) {
 const elapsed = (value) => typeof value === "number" && Number.isFinite(value) && value >= 0
   ? `${Math.floor(value / 60).toString().padStart(2, "0")}:${Math.floor(value % 60).toString().padStart(2, "0")}` : "Time not recorded";
 
+function perceptionPolicy(r) {
+  if (!exploration(r)) return "";
+  const p = r.perception_policy;
+  if (!p || p.mode === "legacy_unrecorded") return '<p class="hint spacer">Perception policy: not recorded in this historical report.</p>';
+  return `<details class="hint spacer"><summary>Persona perception policy · ${esc(p.mode)}</summary>
+    <p>Parameter status: ${esc(p.parameter_status)}. No human-data calibration is active.</p>
+    <p>Candidate budget: ${esc(p.parameters?.candidate_budget ?? "All observed controls (baseline)")}. Policy rejections: ${esc(p.policy_rejections || 0)}.</p>
+    ${p.mixed_policy_history ? '<p class="warning">This history contains different or unrecorded policies; do not treat it as a matched single-mode benchmark.</p>' : ""}
+    <pre>${esc(JSON.stringify(p.parameters || {}, null, 2))}</pre>
+    ${(p.recorded_decisions || []).map(s => `<p>Step ${esc(s.step)} · ${esc(s.mode)} · ${esc(s.projected_controls ?? "Unknown")} projected / ${esc(s.observed_controls ?? "Unknown")} observed controls · ${esc(s.actionable_controls ?? "Unknown")} permitted targets${s.rejected ? " · decision rejected" : ""}</p>`).join("")}
+    ${(p.limitations || []).map(x => `<p>${esc(x)}</p>`).join("")}</details>`;
+}
+
 function experienceSummary(r) {
   if (!exploration(r)) return "";
   const trace = r.journey_summary;
@@ -160,7 +173,7 @@ export function report() {
   return steps(3) + heading(exploration(r) ? "Exploration report" : r.task || "Evaluation report", `${r.persona} · ${r.method || "Screenshot UX evaluation"}`, btn("↓ Export report JSON", "export-report", "ghost")) + `
     <div class="hint">${intro}</div><div class="grid cols4 spacer">${metrics.map(([label, count]) => `<div class="panel stat"><small>${label}</small><strong>${esc(count)}</strong></div>`).join("")}</div>
     <div class="tabs spacer">${(exploration(r) ? [["Experience & findings", "Overview"], ["Journey evidence", "Evidence"]] : [["Overview", "Overview"], ["Review cases", "Review cases"], ["Evidence", "Evidence"]]).map(([label, key]) => btn(label, "report-tab", key === state.reportTab ? "primary" : "ghost", key)).join("")}</div>
-    <div class="deck"><section class="panel">${state.reportTab === "Overview" ? `${experienceSummary(r)}${claimDetails(r)}<h2 class="spacer">${exploration(r) ? "Potential UX issues" : "Model observations"}</h2>${findings(r)}${recommendations(r)}${feedback(r)}${unsupportedClaims(r)}` : state.reportTab === "Review cases" ? scope(r) : evidence(r)}
+    <div class="deck"><section class="panel">${state.reportTab === "Overview" ? `${experienceSummary(r)}${perceptionPolicy(r)}${claimDetails(r)}<h2 class="spacer">${exploration(r) ? "Potential UX issues" : "Model observations"}</h2>${findings(r)}${recommendations(r)}${feedback(r)}${unsupportedClaims(r)}` : state.reportTab === "Review cases" ? scope(r) : evidence(r)}
     ${r.limitations?.length ? `<details class="hint spacer"><summary>Recorded limitations</summary>${r.limitations.map((v) => `<p>${esc(v)}</p>`).join("")}</details>` : ""}</section>
     <aside class="panel" style="align-self:start"><div class="eyebrow">Persona overview</div><h3>${esc(r.persona)}</h3>
       ${[["Goal", r.task || "Not recorded"], ["Technical familiarity", r.persona_snapshot?.technical_skill || r.persona_snapshot?.technical_level || "Not recorded"], ["URL", r.url || "Not recorded"], ["Mode", exploration(r) ? "Browser exploration" : "Screenshot UX"], ["Review", exploration(r) ? reviewLabel(r.review_status) : "Screenshot analysis"], ["Project", project?.name || "Ungrouped"], ["Model", r.model || "Not recorded"], ["Run date", r.imported ? "Not recorded" : date(r.created_at)]].map(([label, value]) => `<div class="listrow"><small>${label}</small><span class="context-value">${esc(value)}</span></div>`).join("")}

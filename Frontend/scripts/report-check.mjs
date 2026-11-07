@@ -77,3 +77,24 @@ html = report();
 assert.ok(html.includes('Historical assertion: claim-level validation was not run.'));
 assert.ok(!html.includes('UX hypothesis · Developer review required'));
 console.log('Claim rendering checks passed: fact/hypothesis separation, reproduction, uncertainty, legacy assertions and escaping.');
+
+assert.ok(html.includes('Perception policy: not recorded'));
+for (const mode of ['neutral_passthrough', 'provisional_pilot_v1']) {
+  state.report.perception_policy = {mode, parameter_status: 'provisional', human_calibrated: false,
+    parameters: {candidate_budget: mode === 'neutral_passthrough' ? null : 16}, policy_rejections: 1,
+    mixed_policy_history: true, recorded_decisions: [{step: 1, mode, observed_controls: 40,
+      projected_controls: 16, actionable_controls: 16, rejected: true}], limitations: ['Engineering hypothesis only.']};
+  html = report();
+  assert.ok(html.includes(mode));
+  assert.ok(html.includes('No human-data calibration is active'));
+  assert.ok(html.includes('decision rejected'));
+  assert.ok(html.includes('do not treat it as a matched single-mode benchmark'));
+  assert.ok(html.includes('Engineering hypothesis only.'));
+}
+state.report.perception_policy.parameters.candidate_budget = '<script>unsafe</script>';
+state.report.perception_policy.policy_rejections = '<img src=x onerror=alert(1)>';
+html = report();
+assert.ok(!html.includes('<script>'));
+assert.ok(!html.includes('<img src=x'));
+assert.ok(html.includes('&lt;script&gt;unsafe'));
+console.log('Perception policy rendering checks passed: modes, provisional status, counts, mixed histories and escaping.');

@@ -203,10 +203,13 @@ class PersonaAPITests(unittest.TestCase):
         plan = {'persona': compatibility_record(config), 'instructions': 'Find help',
                 'cases': [], 'url': 'https://example.com', 'persona_id': 'visitor',
                 'project_id': None, 'max_actions': 1}
-        with patch('Backend.app.live.sync_playwright', side_effect=RuntimeError('browser unavailable')):
+        with patch.dict('os.environ', {'OMNI_PERSONA_POLICY':'neutral_passthrough'}), \
+             patch('Backend.app.live.sync_playwright', side_effect=RuntimeError('browser unavailable')):
             run_live('snapshot', plan, Mock())
         snapshot = db.read(db.directory('results') / 'exploration_snapshot' / 'persona.json')
-        self.assertEqual(snapshot['runtime_profile'], resolve_persona(config, 'Find help').model_dump())
+        expected = resolve_persona(config, 'Find help')
+        expected.engine.policy_mode = 'neutral_passthrough'
+        self.assertEqual(snapshot['runtime_profile'], expected.model_dump())
         self.assertEqual(snapshot['task'], 'Find help')
 
     def test_screenshot_entrypoint_projects_canonical_profile(self):

@@ -188,7 +188,7 @@ class OutcomeIntegrationTests(unittest.TestCase):
             state = {'url': 'https://shop.test/cart', 'title': 'Cart', 'visible_text': 'Other', 'controls': []}
             with patch.object(cli, 'ROOT', root), patch.object(cli, 'sync_playwright', api), \
                  patch.object(cli, 'observe', return_value=(state, {})), \
-                 patch('Backend.agents.exploration_agent.explore_next', return_value={'action': 'stop', 'reason': 'Complete'}), \
+                 patch('Backend.agents.exploration_agent.explore_next', return_value={'action': 'stop', 'target': -1, 'reason': 'Complete'}), \
                  patch('Backend.agents.exploration_agent.review_run', return_value=review()), \
                  patch.dict('os.environ', {}), \
                  patch('sys.argv', ['explore', '--url', 'https://shop.test/cart', '--max-actions', '1',
@@ -212,7 +212,7 @@ class OutcomeIntegrationTests(unittest.TestCase):
             with patch('Backend.app.live.sync_playwright', api), \
                  patch('Backend.app.live.observe', return_value=(state, {})), \
                  patch('Backend.app.live.capture_step', return_value='step-1-after.png'), \
-                 patch('Backend.app.live.explore_next', return_value={'action': 'stop', 'reason': 'Task completed', 'task_outcome': 'verified_complete'}), \
+                 patch('Backend.app.live.explore_next', return_value={'action': 'stop', 'target': -1, 'reason': 'Task completed', 'task_outcome': 'verified_complete'}), \
                  patch('Backend.app.live.review_run', return_value=review()):
                 run_live('outcome', plan, MagicMock())
             result = db.read(Path(folder) / 'results/exploration_outcome/report.json')
