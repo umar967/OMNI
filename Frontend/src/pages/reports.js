@@ -112,7 +112,7 @@ function perceptionPolicy(r) {
     <p>Candidate budget: ${esc(p.parameters?.candidate_budget ?? "All observed controls (baseline)")}. Policy rejections: ${esc(p.policy_rejections || 0)}.</p>
     ${p.mixed_policy_history ? '<p class="warning">This history contains different or unrecorded policies; do not treat it as a matched single-mode benchmark.</p>' : ""}
     <pre>${esc(JSON.stringify(p.parameters || {}, null, 2))}</pre>
-    ${(p.recorded_decisions || []).map(s => `<p>Step ${esc(s.step)} · ${esc(s.mode)} · ${esc(s.projected_controls ?? "Unknown")} projected / ${esc(s.observed_controls ?? "Unknown")} observed controls · ${esc(s.actionable_controls ?? "Unknown")} permitted targets${s.rejected ? " · decision rejected" : ""}</p>`).join("")}
+    ${(p.recorded_decisions || []).map(s => `<p>Step ${esc(s.step)} · ${esc(s.mode)} · ${esc(s.projected_controls ?? "Unknown")} projected / ${esc(s.observed_controls ?? "Unknown")} observed controls · ${esc(s.actionable_controls ?? "Unknown")} permitted targets${s.rejected ? " · decision rejected" : ""}${s.scan_pass != null ? ` · scan pass ${esc(s.scan_pass)} (${s.scan_available ? "more scanning available" : "scanning unavailable or exhausted"})` : ""}${s.text ? ` · text ${esc(s.text.exposed_fragments)} exposed / ${esc(s.text.observed_fragments)} observed · source ${esc(s.text.source_status)}${s.text.partial ? " · text coverage limited" : ""}` : ""}</p>`).join("")}
     ${(p.limitations || []).map(x => `<p>${esc(x)}</p>`).join("")}</details>`;
 }
 

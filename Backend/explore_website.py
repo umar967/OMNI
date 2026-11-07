@@ -14,6 +14,7 @@ from Backend.app.visual_evidence import capture_step
 from Backend.agents.gemini_requests import ModelRequestError
 from Backend.persona_engine.resolver import resolve_persona, agent_persona
 from Backend.persona_engine.session import PerceptionSession
+from Backend.text_observations import observe_text
 from Backend.task_outcomes import TaskContract, verify, unverified, attach_verification
 
 ROOT = Path(__file__).resolve().parent
@@ -51,6 +52,7 @@ def observe(page):
                 effectiveOpacity *= Number(getComputedStyle(node).opacity);
             }
             return {tag: el.tagName.toLowerCase(), type: el.type || '',
+                privacy_sensitive: !!el.closest('[contenteditable="true"],[data-omni-private],[data-private]'),
                 name: el.getAttribute('aria-label') || labelled.trim() || labels ||
                       el.innerText?.trim() || el.getAttribute('placeholder') || '',
                 disabled: el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true',
@@ -100,7 +102,9 @@ def observe(page):
         }
         return chunks.join('\\n');
     }''')
+    text_observation = observe_text(page, handles, SELECTOR)
     return {'url': page.url, 'title': page.title(), 'visible_text': text, 'controls': controls,
+            'text_observation':text_observation,
             'viewport': page.evaluate('() => ({width: innerWidth, height: innerHeight})'),
             'scroll': page.evaluate('() => ({x: scrollX, y: scrollY, height: document.documentElement.scrollHeight})')}, handles
 
@@ -296,7 +300,7 @@ def main():
                     if result == 'outcome_unknown':
                         stop_reason = 'Uncertain action dispatch; automatic retries disabled.'
                         break
-                    if row.get('perception_rejection') or result.startswith('refresh_required:'):
+                    if row.get('perception_rejection') or result == 'perception_scanned' or result.startswith('refresh_required:'):
                         continue  # Observe anew; never rebind the old ID.
                     if result.startswith('blocked:') or result == 'automation_error':
                         stop_reason = 'Execution boundary: ' + result

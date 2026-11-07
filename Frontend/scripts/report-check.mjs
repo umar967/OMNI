@@ -98,3 +98,12 @@ assert.ok(!html.includes('<script>'));
 assert.ok(!html.includes('<img src=x'));
 assert.ok(html.includes('&lt;script&gt;unsafe'));
 console.log('Perception policy rendering checks passed: modes, provisional status, counts, mixed histories and escaping.');
+
+state.report.perception_policy.recorded_decisions[0] = {step: 1, mode: 'provisional_pilot_v1', scan_pass: 2,
+  scan_available: false, text: {exposed_fragments: 10, observed_fragments: 30, source_status: 'partial', partial: true}};
+html = report();
+assert.ok(html.includes('scan pass 2'));
+assert.ok(html.includes('scanning unavailable or exhausted'));
+assert.ok(html.includes('text 10 exposed / 30 observed'));
+assert.ok(html.includes('text coverage limited'));
+console.log('Geometry text and scan reporting checks passed.');

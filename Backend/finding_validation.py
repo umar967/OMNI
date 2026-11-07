@@ -167,7 +167,31 @@ def observations(history, verification=None, folder=None):
         if before.get('url') and after.get('url') and before['url'] != after['url']:
             add('url', 'url_changed', f"Recorded URL changed from {before['url']} to {after['url']}.",
                 field='url', refs=refs_for(row, 'before', 'url', folder) + refs_for(row, 'after', 'url', folder))
-        if isinstance(before.get('visible_text'), str) and isinstance(after.get('visible_text'), str):
+        def text_blocks(state):
+            if 'text_blocks' in state:
+                blocks = state['text_blocks']
+            else:
+                structured = state.get('text_observation', {})
+                if not isinstance(structured, dict) or structured.get('version') != 'geometry-text-1':
+                    return None
+                blocks = structured.get('blocks', [])
+            if not isinstance(blocks, list):
+                return []
+            return [b for b in blocks if isinstance(b, dict) and isinstance(b.get('id'), str)
+                    and isinstance(b.get('text'), str) and
+                    b.get('fingerprint') == hashlib.sha256((b['id']+b['text']).encode()).hexdigest()]
+        before_blocks, after_blocks = text_blocks(before), text_blocks(after)
+        if before_blocks is not None and after_blocks is not None:
+            # Stable fragment IDs/fingerprints preserve claim identity when a
+            # model sees a subset. Flat-text line indexes change under filtering.
+            old = {b.get('fingerprint') for b in before_blocks}
+            for b in after_blocks:
+                if (b.get('fingerprint') not in old and b.get('id') and b.get('text')
+                        and b.get('privacy') == 'screened'):
+                    add(f"text-{b['id']}-{b['fingerprint'][:12]}", 'text_appeared',
+                        f"After-sample contains this page-authored text, absent from the before-sample: {b['text']!r}.",
+                        refs=refs_for(row, 'before', 'text_observation.blocks', folder) + refs_for(row, 'after', 'text_observation.blocks', folder))
+        elif before_blocks is None and after_blocks is None and isinstance(before.get('visible_text'), str) and isinstance(after.get('visible_text'), str):
             old = set(before['visible_text'].splitlines())
             for i, line in enumerate(after['visible_text'].splitlines()):
                 if line.strip() and line not in old and len(line) <= 1000:
@@ -178,7 +202,7 @@ def observations(history, verification=None, folder=None):
             counts = Counter(c.get('id') for c in controls if type(c.get('id')) is int)
             for c in controls:
                 cid = c.get('id')
-                if type(cid) is not int or counts[cid] != 1 or not isinstance(c.get('name'), str):
+                if type(cid) is not int or counts[cid] != 1 or not isinstance(c.get('name'), str) or c.get('label_redacted'):
                     continue
                 label = c['name'].strip()
                 kind = 'control_observed' if label else 'control_unlabelled'

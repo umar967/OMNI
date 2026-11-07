@@ -156,7 +156,7 @@ def explore_next(persona, observation, history):
         return next_action(persona, observation, history, request_json)
     schema = {'type': 'OBJECT', 'properties': {
         'action': {'type': 'STRING', 'enum': ['click', 'fill', 'select', 'check',
-                    'hover', 'press', 'scroll', 'back', 'home', 'wait', 'stop']},
+                    'hover', 'press', 'scroll', 'back', 'home', 'wait', 'stop', 'scan']},
         'target': {'type': 'INTEGER'}, 'value': {'type': 'STRING'},
         'reason': {'type': 'STRING'}, 'area': {'type': 'STRING'}},
         'required': ['action', 'target', 'value', 'reason', 'area']}
@@ -209,6 +209,9 @@ press: value="Escape", target=-1 to close an overlay; or value="Enter" and
 target=a search input ID to submit a search. Enter is not allowed in other fields.
 scroll: target=-1, value="down" or "up".
 back/home/wait/stop: target=-1, value="". Home returns to the starting page.
+scan: target=-1, value=""; when CURRENT VIEWPORT.perception.scan_available is true,
+request additional candidates before giving up. This is a perception-only operation,
+not browser execution or evidence that the task succeeded.
 area: a short name for the feature you are exploring, e.g. Search or Product details.
 No private credentials, payments, purchases, account creation, subscriptions,
 messages, deletion or irreversible form submissions. Inspect account forms but

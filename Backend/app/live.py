@@ -81,7 +81,7 @@ def run_live(item_id, plan, progress):
                         if result == 'outcome_unknown':
                             stop_reason = 'Uncertain action dispatch; automatic retries disabled.'
                             break
-                        if row.get('perception_rejection') or result.startswith('refresh_required:'):
+                        if row.get('perception_rejection') or result == 'perception_scanned' or result.startswith('refresh_required:'):
                             continue  # A new observation gets new IDs and handles.
                         if verification.task_outcome == 'verified_complete':
                             report['execution_status'] = 'finished'

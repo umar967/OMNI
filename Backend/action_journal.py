@@ -21,7 +21,16 @@ def atomic_json(path, data):
             json.dump(data, stream, indent=2, ensure_ascii=False)
             stream.flush()
             os.fsync(stream.fileno())
-        os.replace(temp, path)
+        # Windows readers/indexers can briefly deny replacement. Retry only this
+        # atomic filesystem operation, never the browser action or dispatch.
+        for attempt in range(4):
+            try:
+                os.replace(temp, path)
+                break
+            except PermissionError as exc:
+                if os.name != 'nt' or getattr(exc, 'winerror', None) not in (5, 32, 33) or attempt == 3:
+                    raise
+                time.sleep((0.05, 0.1, 0.2)[attempt])
     finally:
         if temp.exists():
             temp.unlink()
@@ -38,6 +47,9 @@ def evidence_gaps(row, folder=None):
     if not row.get('after'):
         gaps.append('After-observation unavailable; resulting page state is unknown.')
     for phase in ('before', 'after'):
+        text_status = row.get(phase, {}).get('text_observation', {}).get('status')
+        if text_status in ('partial', 'unavailable'):
+            gaps.append(f'{phase.capitalize()} geometry-linked text observation {text_status}.')
         filename = row.get('screenshots', {}).get(phase)
         expected = f"step-{row.get('step')}-{phase}.png"
         if not filename or (folder is not None and (filename != expected or not (folder / 'evidence' / expected).is_file())):

@@ -12,16 +12,17 @@ import hashlib
 import json
 import math
 from typing import Any
+from .text_policy import forbidden_strings, project_text, safe_blocks, scrub_strings
 
 TARGET_ACTIONS = frozenset({'click', 'fill', 'select', 'check', 'hover'})
-NO_TARGET_ACTIONS = frozenset({'scroll', 'back', 'home', 'wait', 'stop'})
+NO_TARGET_ACTIONS = frozenset({'scroll', 'back', 'home', 'wait', 'stop', 'scan'})
 
 # Candidate budgets are *scenario hypotheses*, not inferred human probabilities.
 PROVISIONAL_BUDGETS = {'beginner': 16, 'intermediate': 24, 'advanced': 32}
 ATTENTION_OFFSETS = {'focused': -8, 'standard': 0, 'broad': 8}
-CONTROL_FIELDS = ('id', 'tag', 'type', 'name', 'disabled', 'checked', 'options',
+CONTROL_FIELDS = ('id', 'tag', 'type', 'name', 'disabled', 'checked', 'options', 'label_redacted',
                   'bounding_box', 'viewport_position', 'style', 'visibility', 'label_metadata')
-POLICY_VERSION = 'stage-a-1.1'
+POLICY_VERSION = 'stage-b1-1'
 
 
 def _number(value: Any) -> float | None:
@@ -122,6 +123,8 @@ class PerceivedStep:
     allowed_targets: frozenset[int]
     provenance: dict
     diagnostics: dict
+    scan_key: str = ''
+    scan_pass: int = 0
 
 
 @dataclass
@@ -131,6 +134,7 @@ class PilotPerception:
     mode: str = 'provisional_pilot_v1'  # or neutral_passthrough
     _view_cache: dict[str, tuple[int, ...]] = field(default_factory=dict)
     noticed_fingerprints: set[str] = field(default_factory=set)
+    _scan_passes: dict[str, int] = field(default_factory=dict)
 
     def __post_init__(self):
         if self.mode not in ('provisional_pilot_v1', 'neutral_passthrough'):
@@ -148,7 +152,13 @@ class PilotPerception:
                 'candidate_budget':max(8, PROVISIONAL_BUDGETS[level] + ATTENTION_OFFSETS[focus]) if self.mode == 'provisional_pilot_v1' else None,
                 'score_weights':{'centrality':0.40, 'area':0.30, 'label_present':0.20, 'font_size':0.10} if self.mode == 'provisional_pilot_v1' else {},
                 'centrality_center':[0.5, 0.42], 'distance_scale':0.8, 'area_scale':30, 'font_scale_px':24,
-                'flat_text_policy':'blank' if self.mode == 'provisional_pilot_v1' else 'passthrough'}
+                'flat_text_policy':'geometry_linked_when_available',
+                'legacy_flat_text_policy':'blank' if self.mode == 'provisional_pilot_v1' else 'passthrough',
+                'configured_text_budget':self.profile.get('perception', {}).get('text_budget', 80),
+                'text_budget':self.profile.get('perception', {}).get('text_budget', 80) if self.mode == 'provisional_pilot_v1' else 256,
+                'scanning':self.profile.get('perception', {}).get('scanning', 'progressive'),
+                'max_scan_passes':self.profile.get('perception', {}).get('max_scan_passes', 3),
+                'scan_schedule':'cumulative_budget_per_explicit_scan', 'calibration_status':'provisional'}
 
     def provenance(self):
         data = {'version':POLICY_VERSION, 'mode':self.mode, 'profile':self.profile}
@@ -164,11 +174,12 @@ class PilotPerception:
         keys = set(raw_by_id)
         if len(keys) != len(controls):
             raise ValueError('Snapshot contains invalid or duplicate control IDs')
+        view_key = _view_key(observation)
+        scan_pass = self._scan_passes.get(view_key, 0)
         if self.mode == 'neutral_passthrough':
             selected = tuple(c['id'] for c in controls)
             text = observation.get('visible_text', '')
         else:
-            view_key = _view_key(observation)
             if view_key not in self._view_cache:
                 level = self.profile.get('technical_experience', 'intermediate')
                 focus = (self.profile.get('perception') or {}).get('attention', 'standard')
@@ -176,21 +187,58 @@ class PilotPerception:
                     raise ValueError('Persona must be resolved by the universal schema first')
                 budget = max(8, PROVISIONAL_BUDGETS[level] + ATTENTION_OFFSETS[focus])
                 rank = sorted(extract_features(observation), key=lambda f: (-_score(f), f['id']))
-                chosen = {f['id'] for f in rank[:budget]}
-                selected = tuple(c['id'] for c in controls if c['id'] in chosen)
-                self._view_cache[view_key] = selected
-            selected = self._view_cache[view_key]
-            # Raw flat text may expose filtered-out control labels. With no
-            # text-to-element geometry, fail closed. Future version can add safe spans.
+                self._view_cache[view_key] = tuple(f['id'] for f in rank)
+            budget = self.parameters()['candidate_budget'] * (1 + scan_pass)
+            chosen = set(self._view_cache[view_key][:budget])
+            selected = tuple(c['id'] for c in controls if c['id'] in chosen)
             text = ''
+        denied = forbidden_strings(observation, set(selected))
+        text_budget = (self.parameters()['text_budget'] * (1 + scan_pass)
+                       if self.mode == 'provisional_pilot_v1' else 256)
+        blocks, text_diagnostics = project_text(observation, set(selected), text_budget, denied)
+        if 'text_observation' in observation:
+            text = '\n'.join(b['text'] for b in blocks)
+        else:
+            text = scrub_strings(text, denied)
         allowed = frozenset(cid for cid in selected if not raw_by_id[cid].get('disabled'))
         self.noticed_fingerprints.update(_fingerprint(raw_by_id[i]) for i in selected)
         view = sanitize_view({**observation, 'visible_text':text,
                               'controls':[c for c in controls if c['id'] in selected]})
+        view['text_blocks'] = blocks
+        view['text_status'] = text_diagnostics
+        privacy_unavailable = observation.get('text_observation', {}).get('status') == 'unavailable'
+        for c in view['controls']:
+            raw = raw_by_id[c['id']]
+            for field_name in ('name', 'label_metadata', 'options'):
+                if field_name in c:
+                    c[field_name] = scrub_strings(c[field_name], denied)
+            if privacy_unavailable or raw.get('privacy_sensitive') or c['id'] in observation.get('text_observation', {}).get('private_control_ids', []):
+                c.update(name='', label_metadata={}, options=[])
+            if c.get('name') != raw.get('name'):
+                c['label_redacted'] = True
+        for key in ('url','title'):
+            view[key] = scrub_strings(view[key], denied)
+            if privacy_unavailable or observation.get('text_observation', {}).get('private_' + key):
+                view[key] = ''
+        can_scan = (self.mode == 'provisional_pilot_v1' and self.parameters()['scanning'] == 'progressive'
+                    and scan_pass < self.parameters()['max_scan_passes']
+                    and (len(selected) < len(controls) or (text_budget > 0 and text_diagnostics['eligible_fragments'] > len(blocks))))
+        view['perception'] = {'scan_available':can_scan, 'scan_pass':scan_pass,
+                             'scan_limit':self.parameters()['max_scan_passes']}
         return PerceivedStep(model_observation=view, allowed_targets=allowed,
               provenance=self.provenance(),
               diagnostics={'observed_controls': len(controls), 'projected_controls': len(selected),
-                           'actionable_controls': len(allowed)})
+                           'actionable_controls': len(allowed), 'scan_pass':scan_pass,
+                           'scan_available':can_scan, 'text':text_diagnostics},
+              scan_key=view_key, scan_pass=scan_pass)
+
+    def scan(self, step):
+        if not step.model_observation.get('perception', {}).get('scan_available'):
+            return False
+        if step.scan_pass != self._scan_passes.get(step.scan_key, 0):
+            return False
+        self._scan_passes[step.scan_key] = step.scan_pass + 1
+        return True
 
 
 def validate_action(decision: dict, step: PerceivedStep) -> str | None:
@@ -237,6 +285,10 @@ def sanitize_view(view: dict) -> dict:
         controls.append(safe)
     return {'url':view.get('url'), 'title':view.get('title'),
             'visible_text':view.get('visible_text', ''), 'controls':controls,
+            'text_blocks':safe_blocks(view.get('text_blocks') or []),
+            'text_status':{k:deepcopy(v) for k,v in (view.get('text_status') or {}).items()
+                           if k in ('source_status','observed_fragments','eligible_fragments','exposed_fragments','withheld_fragments','partial')},
+            'perception':{k:v for k,v in (view.get('perception') or {}).items() if k in ('scan_available','scan_pass','scan_limit')},
             'viewport':{k:v for k,v in (view.get('viewport') or {}).items() if k in ('width','height')},
             'scroll':{k:v for k,v in (view.get('scroll') or {}).items() if k in ('x','y','height')}}
 
@@ -261,7 +313,7 @@ def project_history(history: list[dict], policy_key: str | None = None) -> list[
         result = row.get('result') or 'unavailable'
         if not known:
             result = 'unverified_history'
-        elif result not in ('executed', 'agent_stopped', 'outcome_unknown'):
+        elif result not in ('executed', 'agent_stopped', 'outcome_unknown', 'perception_scanned'):
             result = 'blocked: action rejected' if row.get('action_status') == 'blocked' else 'automation_error'
         projected.append({'step': row.get('step'), 'before': before,
                           'journal_version':1 if known and row.get('journal_version') == 1 else None,

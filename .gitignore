@@ -3,6 +3,7 @@
 __pycache__/
 *.py[cod]
 Backend/results/exploration_*/
+Backend/results/retention_b1_*/
 
 node_modules/
 /Backend/projects/

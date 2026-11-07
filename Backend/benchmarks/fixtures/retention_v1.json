@@ -1,0 +1,197 @@
+{
+  "version": "retention-1",
+  "suite_id": "geometry-retention-development-v1",
+  "policy_version": "stage-b1-1",
+  "modes": [
+    "neutral_passthrough",
+    "provisional_pilot_v1"
+  ],
+  "personas": {
+    "beginner": {
+      "schema_version": "1.0",
+      "profile": {
+        "name": "Benchmark beginner",
+        "description": "",
+        "technical_experience": "beginner",
+        "website_familiarity": "unspecified",
+        "environment": {
+          "device": "desktop",
+          "viewport": {
+            "width": 1366,
+            "height": 768
+          },
+          "input_method": "mouse_keyboard"
+        },
+        "accessibility": {
+          "screen_reader_required": false,
+          "reduced_motion_required": false,
+          "visual_requirements": [],
+          "notes": ""
+        },
+        "perception": {
+          "attention": "standard",
+          "label_preference": "neutral",
+          "text_budget": 80,
+          "scanning": "progressive",
+          "max_scan_passes": 3
+        },
+        "navigation": {
+          "strategy": "neutral",
+          "preferred_actions": [],
+          "notes": []
+        },
+        "recovery": {
+          "approach": "standard",
+          "retry_limit": null
+        },
+        "task_context": {
+          "default_goal": null,
+          "domain": "",
+          "criteria": [
+            "Clarity of labels and feedback"
+          ]
+        }
+      },
+      "calibration": [],
+      "provenance": {
+        "origin": "custom",
+        "source": "User-defined profile",
+        "notes": []
+      }
+    }
+  },
+  "max_actions": 8,
+  "purpose": "engineering_regression",
+  "cases": [
+    {
+      "interface_id": "catalog-clean",
+      "task_id": "clean",
+      "family_id": "synthetic-catalog",
+      "split": "development",
+      "fixture": "clean",
+      "task": {
+        "description": "Open product listing and observe products.",
+        "endpoint": {
+          "strategy": "product_listing",
+          "expected_url": "http://omni-retention.test/",
+          "container_selector": "#products",
+          "ready_selector": "#ready",
+          "item_selector": ".product",
+          "name_selector": ".name",
+          "complete_collection": true
+        }
+      },
+      "targets": [
+        {
+          "target_id": "listing-entry",
+          "selector": "#open-catalog",
+          "critical": true
+        }
+      ]
+    },
+    {
+      "interface_id": "catalog-dense",
+      "task_id": "dense",
+      "family_id": "synthetic-catalog",
+      "split": "development",
+      "fixture": "dense",
+      "task": {
+        "description": "Open product listing and observe products.",
+        "endpoint": {
+          "strategy": "product_listing",
+          "expected_url": "http://omni-retention.test/",
+          "container_selector": "#products",
+          "ready_selector": "#ready",
+          "item_selector": ".product",
+          "name_selector": ".name",
+          "complete_collection": true
+        }
+      },
+      "targets": [
+        {
+          "target_id": "listing-entry",
+          "selector": "#open-catalog",
+          "critical": true
+        }
+      ]
+    },
+    {
+      "interface_id": "catalog-below_fold",
+      "task_id": "below_fold",
+      "family_id": "synthetic-catalog",
+      "split": "development",
+      "fixture": "below_fold",
+      "task": {
+        "description": "Open product listing and observe products.",
+        "endpoint": {
+          "strategy": "product_listing",
+          "expected_url": "http://omni-retention.test/",
+          "container_selector": "#products",
+          "ready_selector": "#ready",
+          "item_selector": ".product",
+          "name_selector": ".name",
+          "complete_collection": true
+        }
+      },
+      "targets": [
+        {
+          "target_id": "listing-entry",
+          "selector": "#open-catalog",
+          "critical": true
+        }
+      ]
+    },
+    {
+      "interface_id": "catalog-disabled",
+      "task_id": "disabled",
+      "family_id": "synthetic-catalog",
+      "split": "development",
+      "fixture": "disabled",
+      "task": {
+        "description": "Open product listing and observe products.",
+        "endpoint": {
+          "strategy": "product_listing",
+          "expected_url": "http://omni-retention.test/",
+          "container_selector": "#products",
+          "ready_selector": "#ready",
+          "item_selector": ".product",
+          "name_selector": ".name",
+          "complete_collection": true
+        }
+      },
+      "targets": [
+        {
+          "target_id": "listing-entry",
+          "selector": "#open-catalog",
+          "critical": true
+        }
+      ]
+    },
+    {
+      "interface_id": "catalog-error_message",
+      "task_id": "error_message",
+      "family_id": "synthetic-catalog",
+      "split": "development",
+      "fixture": "error_message",
+      "task": {
+        "description": "Open product listing and observe products.",
+        "endpoint": {
+          "strategy": "product_listing",
+          "expected_url": "http://omni-retention.test/",
+          "container_selector": "#products",
+          "ready_selector": "#ready",
+          "item_selector": ".product",
+          "name_selector": ".name",
+          "complete_collection": true
+        }
+      },
+      "targets": [
+        {
+          "target_id": "listing-entry",
+          "selector": "#open-catalog",
+          "critical": true
+        }
+      ]
+    }
+  ]
+}

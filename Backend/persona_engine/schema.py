@@ -41,6 +41,11 @@ class Accessibility(Contract):
 class Perception(Contract):
     attention: Literal['standard', 'focused', 'broad'] = 'standard'
     label_preference: Literal['neutral', 'explicit'] = 'neutral'
+    text_budget: int = Field(default=80, ge=0, le=256, strict=True,
+                             description='Provisional maximum text fragments per scan window; zero withholds text.')
+    scanning: Literal['progressive', 'disabled'] = 'progressive'
+    max_scan_passes: int = Field(default=3, ge=0, le=16, strict=True,
+                                description='Provisional additional scan passes per observed layout, bounded by run action limit.')
 
 
 class Navigation(Contract):

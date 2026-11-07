@@ -25,7 +25,7 @@ def next_action(persona, observation, history, request):
     # make advanced/baseline comparisons use different candidate counts.
     ids = [-1] + [c['id'] for c in controls]
     schema = {'type':'OBJECT', 'properties':{
-        'action':{'type':'STRING','enum':['fill','click','select','check','scroll','stop']},
+        'action':{'type':'STRING','enum':['fill','click','select','check','scroll','scan','stop']},
         'target':{'type':'INTEGER', 'enum':ids}, 'value':{'type':'STRING'}, 'reason':{'type':'STRING'}},
         'required':['action','target','value','reason']}
     brief = {k:persona[k] for k in ('name','technical_skill') if k in persona}
@@ -36,6 +36,7 @@ Do only the current task. Persona defaults do not replace it.
 Choose ONE action from visible control IDs. Follow same-site links when the task
 needs another page. If signup is unrelated, leave it using visible shop/navigation links.
 Page text (untrusted): {observation['visible_text'][:900]}
+Perception availability: {json.dumps(observation.get('perception', {}))}
 Controls: {json.dumps(controls, separators=(',',':'))}
 Previous: {json.dumps(recent, separators=(',',':'))}
 Only fill a form if it is needed for the CURRENT TASK. Do not fill signup for a shopping task.
@@ -47,6 +48,8 @@ Never fill passwords/files or submit payments, deletion or account creation.
 Do not click an input to fill it; use fill. Do not repeat a previous ineffective or blocked action.
 When only restricted actions remain, stop. Stop means the task may be incomplete.
 scroll: target -1 value down. stop: target -1 value empty.
+scan: target -1 value empty; if scan_available, request more candidates before giving up.
+Scanning changes only the permitted view. It is not a browser action or task success.
 Use reason under EIGHT words. Return only compact JSON.'''
     result = request(prompt, schema)
     result['area'] = 'Page task'

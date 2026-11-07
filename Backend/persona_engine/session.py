@@ -38,6 +38,13 @@ class PerceptionSession:
 
     def execute(self, journal, row, perceived, executor, page, handles, home):
         problem = validate_action(row['decision'], perceived)
+        if not problem and row['decision']['action'] == 'scan':
+            if self.policy.scan(perceived):
+                journal.update(row, result='perception_scanned', action_status='executed',
+                               action_kind='perception', dispatch_state='not_dispatched',
+                               scan_pass=perceived.scan_pass+1)
+                return 'perception_scanned'
+            problem = 'blocked: scanning unavailable or exhausted for this profile/view'
         if problem:
             journal.update(row, result=problem, action_status='blocked', dispatch_state='not_dispatched',
                            perception_rejection=problem)
@@ -68,6 +75,7 @@ def policy_report(provenance, history):
                 'mixed_policy_history':any(r.get('perception_policy', {}).get('policy_key') != provenance['policy_key'] for r in history),
                 'review_evidence_scope':'Persona-permitted projections; full evidence used only by deterministic validation.',
                 'limitations':['Scenario budgets and geometry/label ranking are engineering hypotheses, not measured human attention.',
-                    'Restricted mode omits flat page text; non-control messages and product context may be unavailable to the model.',
+                    'Geometry-linked text is bounded and conservatively filtered; partial, sensitive or ambiguous associations may be withheld.',
+                    'Scanning is explicit and provisional; configured pass and run limits can leave controls undiscovered.',
                     'Navigation, recovery, familiarity and accessibility simulation are not activated by this policy.',
                     'No active human calibration artifacts or empirically validated expertise-group differences.']}
