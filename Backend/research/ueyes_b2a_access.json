@@ -1,0 +1,32 @@
+{
+  "experiment": "approved-selective-ueyes-b2a",
+  "download_limit": 26214400,
+  "extraction_limit": 536870912,
+  "expected_archive_bytes": 12912746325,
+  "published_md5": "c2d53e6af0a47e1f459416d6839ec2c1",
+  "archive_md5_verified": false,
+  "extracted_bytes": 0,
+  "verdict": "partial inspection only",
+  "stop_reason": "ValueError: Missing, weak or changed content identity; body refused",
+  "downloaded_payload_bytes": 0,
+  "requests": [
+    {
+      "url": "https://zenodo.org/records/8010312/files/UEyes_dataset.zip?download=1",
+      "range": "bytes=0-0",
+      "status": 206,
+      "headers": {
+        "server": "nginx",
+        "date": "Sat, 07 Nov 2026 21:26:02 GMT",
+        "content-type": "application/octet-stream",
+        "content-length": "1",
+        "content-disposition": "attachment; filename=UEyes_dataset.zip",
+        "content-range": "bytes 0-0/12912746325",
+        "accept-ranges": "bytes"
+      },
+      "payload_bytes_read": 0
+    }
+  ],
+  "accounting": "One response, Content-Length 1: conservatively charge its entire declared payload (1 byte), including possible transport buffering. Application read 0 body bytes. No retries, redirects or further requests. HTTP headers/TLS overhead are outside the payload figure.",
+  "response_payload_upper_bound_bytes": 1,
+  "budget_charge_bytes": 1
+}

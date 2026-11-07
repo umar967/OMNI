@@ -1,5 +1,58 @@
 # UEyes Stage B2A audit and pre-registered preparation plan
 
+## Approved selective-access experiment: actual result
+
+**Verdict: partial inspection only.** The authorized probe ran against the
+official version-specific file URL on 2026-11-07 at 21:26:02 UTC (November 8
+locally). One request, `Range: bytes=0-0`, returned:
+
+```
+HTTP 206
+Content-Range: bytes 0-0/12912746325
+Content-Length: 1
+Accept-Ranges: bytes
+Content-Disposition: attachment; filename=UEyes_dataset.zip
+```
+
+Range handling and expected archive length were confirmed. Neither ETag nor
+Last-Modified was supplied. No content digest was supplied. Consequently content
+identity could not be independently pinned for subsequent range requests. The
+client stopped at that gate without reading the response body. This establishes
+a limitation of this checked access route, not that all selective-access methods
+are impossible. No alternate URL, retry, redirect or additional range was attempted.
+
+Application payload bytes read: **0**. Conservatively charged payload: **1 byte**,
+covering the complete declared response body if transport buffering received it.
+Extraction: **0 bytes / 0 files**. These figures are below the approved combined
+25 MiB and cumulative extracted 512 MiB limits. HTTP headers/TLS overhead are not
+part of the payload figure; no claim of packet-level wire measurement is made.
+Nonessential response cookies were excluded from the preserved evidence.
+
+No ZIP/ZIP64 directory was obtained, so no actual member paths, compression,
+CRC, image/participant matches or extraction safety checks could be established.
+No genuine records or images were extracted. Coordinate overlays, exclusion
+statistics, actual headers/units and presentation interpretation remain pending.
+The archive's published MD5 remains unverified by local bytes.
+
+Reproducibility files: `research/ueyes_selective.py` (preflight only, no ZIP
+extraction/full-download fallback), `research/ueyes_b2a_access.json` (source URL,
+range, response headers, archive size, published MD5 and accounting), and
+`tests/test_ueyes_access.py`. Four offline tests pass: correct range, invalid/full
+responses and missing identity, changed identity, and exhausted budget. They test
+client guards, not genuine human-data correctness. `git diff --check` passed.
+No runtime code changed and no full regression suite was rerun.
+
+**Smallest next step:** obtain an author-provided small sample with a published
+checksum, or a documented immutable/checksummed selective-download endpoint. A
+sample needs info.csv metadata, one original webpage stimulus and its linked
+participant/block gaze CSV, including presentation timing/scaling documentation.
+Alternatively, propose a different identity-verification protocol for explicit
+review before another experiment. Current approval does not resolve missing
+content identity; no further requests or fitting are being undertaken.
+
+The remaining sections preserve the preceding audit/design and its historical
+access status; this experiment result supersedes that earlier access status.
+
 Audit date: 2026-11-08. Status: **documentation/access audit complete; genuine-data
 coordinate validation blocked pending sample access**. No dataset payload,
 fitting, runtime activation or synthetic substitute was used. Existing policies
