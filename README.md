@@ -223,6 +223,28 @@ Reports Library includes both screenshot evaluations and Backend/results/explora
 
 Run all Python tests from the repository root with `.venv/Scripts/python.exe -m unittest discover -s Backend/tests -t . -v`. The API uses `Backend.app.server:app`; `start.ps1` sets the correct working directory.
 
+### Persona-ready observations (Milestone 1)
+
+The CLI and live runner share `Backend/explore_website.py:observe()`. Each control
+now includes a viewport-relative `bounding_box` in CSS pixels, normalized center
+coordinates and viewport intersection fraction in `viewport_position`, computed
+`style` (font size, foreground and background colors), `visibility`, and
+`label_metadata`. The observation also records the viewport width and height.
+Existing names, disabled states, password redaction, options, and numeric control
+IDs are preserved. IDs identify handles within one observation, not across steps.
+
+The existing viewport and open-dialog filtering remains in effect. Visibility
+metadata is not an occlusion or actionability test: transparent controls remain
+included under the existing rules, with ancestor opacity recorded separately.
+Colors are raw computed CSS values; transparent backgrounds are not composited
+and no contrast or prominence score is inferred. Persona filtering comes next.
+
+`Backend/tests/test_observation.py` exercises local HTML in headless Chrome,
+including geometry, labels, stable snapshots, target identity, scrolling, hidden
+and disabled controls, and dialogs. It makes no model or network requests.
+Set `OMNI_TEST_BROWSER_CHANNEL` to another installed Playwright browser channel
+if needed (an empty value uses bundled Chromium).
+
 ## Separate OMNI-TestLab folder
 
 OMNI-TestLab lives outside this repository, for example at `D:\FYP\OMNI-TestLab`.

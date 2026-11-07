@@ -24,6 +24,11 @@ def save(path, data):
 
 
 def observe(page):
+    """Return viewport controls and their handles; IDs are local to this snapshot.
+
+    Geometry uses CSS pixels. Visibility metadata describes CSS/viewport state,
+    not occlusion, clipping by ancestors, or Playwright actionability.
+    """
     handles, controls = {}, []
     open_dialog = page.query_selector('dialog[open]')
     control_scope = open_dialog if open_dialog else page
@@ -36,12 +41,33 @@ def observe(page):
             const labels = [...(el.labels || [])].map(x => x.innerText).join(' ');
             const labelled = (el.getAttribute('aria-labelledby') || '').split(' ')
                 .map(id => document.getElementById(id)?.innerText || '').join(' ');
+            const intersectionWidth = Math.max(0, Math.min(r.right, innerWidth) - Math.max(r.left, 0));
+            const intersectionHeight = Math.max(0, Math.min(r.bottom, innerHeight) - Math.max(r.top, 0));
+            let effectiveOpacity = 1;
+            for (let node = el; node; node = node.parentElement) {
+                effectiveOpacity *= Number(getComputedStyle(node).opacity);
+            }
             return {tag: el.tagName.toLowerCase(), type: el.type || '',
                 name: el.getAttribute('aria-label') || labelled.trim() || labels ||
                       el.innerText?.trim() || el.getAttribute('placeholder') || '',
                 disabled: el.matches(':disabled') || el.getAttribute('aria-disabled') === 'true',
                 value: el.type === 'password' ? '[redacted]' : (el.value || ''),
                 checked: el.checked ?? null,
+                bounding_box: {x: r.x, y: r.y, width: r.width, height: r.height},
+                viewport_position: {center_x: (r.left + r.width / 2) / innerWidth,
+                    center_y: (r.top + r.height / 2) / innerHeight,
+                    visible_fraction: intersectionWidth * intersectionHeight / (r.width * r.height)},
+                style: {font_size: s.fontSize, color: s.color, background_color: s.backgroundColor},
+                visibility: {css_visibility: s.visibility, display: s.display,
+                    effective_opacity: effectiveOpacity, intersects_viewport: true,
+                    fully_in_viewport: r.left >= 0 && r.top >= 0 &&
+                        r.right <= innerWidth && r.bottom <= innerHeight},
+                label_metadata: {dom_id: el.id || '', role: el.getAttribute('role') || '',
+                    aria_label: el.getAttribute('aria-label') || '',
+                    aria_labelledby: el.getAttribute('aria-labelledby') || '',
+                    labelledby_text: labelled.trim(), associated_labels: labels,
+                    placeholder: el.getAttribute('placeholder') || '',
+                    title: el.getAttribute('title') || ''},
                 options: el.tagName === 'SELECT' ? [...el.options].map(o =>
                     ({text: o.text, value: o.value})) : []};
         }''')
@@ -67,6 +93,7 @@ def observe(page):
         return chunks.join('\\n');
     }''')
     return {'url': page.url, 'title': page.title(), 'visible_text': text, 'controls': controls,
+            'viewport': page.evaluate('() => ({width: innerWidth, height: innerHeight})'),
             'scroll': page.evaluate('() => ({x: scrollX, y: scrollY, height: document.documentElement.scrollHeight})')}, handles
 
 
