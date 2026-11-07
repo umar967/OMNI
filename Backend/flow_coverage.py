@@ -23,7 +23,7 @@ def assess_flows(history, catalog):
         attempt_steps = [row['step'] for row in attempts]
         confirmed_step = None
         for attempt in attempts:
-            if attempt['result'] != 'executed':
+            if attempt['result'] != 'executed' or not attempt.get('after'):
                 continue
             state = attempt['after']
             checks = []

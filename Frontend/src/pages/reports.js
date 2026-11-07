@@ -15,7 +15,7 @@ export function reportRows(records) {
     <div class="listrow"><div class="row"><span class="avatar">↗</span><div>
       <h3>${esc(title(r))}</h3><small>${esc(r.persona)} · ${exploration(r) ? feedbackCount(r) : r.findings.length} ${exploration(r) ? "persona comments" : "findings"}
       · ${exploration(r) ? esc(reviewLabel(r.review_status)) : r.imported ? "Existing report" : esc(date(r.created_at))}</small>
-    </div></div><div class="row"><span class="badge">${exploration(r) ? "Exploration" : "Screenshot UX"}</span>${link("View report ↗", `report/${r.id}`)}</div></div>
+    ${exploration(r) && r.evidence_incomplete ? '<span class="badge warn">Incomplete evidence</span>' : ""}</div></div><div class="row"><span class="badge">${exploration(r) ? "Exploration" : "Screenshot UX"}</span>${link("View report ↗", `report/${r.id}`)}</div></div>
   `).join("") : empty("No reports in this view. Start an evaluation or choose another filter.");
 }
 
@@ -81,6 +81,7 @@ function experienceSummary(r) {
   return `<section class="experience-summary"><div class="sectionhead"><h2>Persona experience</h2><span class="badge">${summary ? "AI interpretation" : "Recorded journey"}</span></div>
     <p>${esc(summary?.comment || trace?.text || "No execution summary is available for this report.")}</p>
     ${summary ? `<small>Based on steps ${esc(summary.steps.join(", "))}. References are checked; the interpretation still needs human review.</small>` : ""}
+    ${r.evidence_incomplete ? '<p class="hint warning">Incomplete evidence: inspect the action journal and missing captures in Journey evidence.</p>' : ""}
     <div class="journey-outcome"><div><small>Task outcome</small><h3>${esc(trace?.outcome || "Completion not verified")}</h3></div><div><small>Session ending</small><p>${esc(trace?.stop_reason || r.stop_reason || "Not recorded")}</p></div></div>
     ${r.outcome_verification ? `<details class="hint spacer"><summary>Independent endpoint verification</summary><p>${esc(r.outcome_verification.reason)}</p><p>Execution: ${esc(r.execution_status || "Not recorded")}</p>${(r.outcome_verification.evidence || []).map(e => `<div id="verification-${esc(e.id)}"><small>Evidence ${esc(e.id)} · ${esc(e.at)} · ${e.step ? `step ${esc(e.step)}` : "endpoint inspection"}</small><pre>${esc(JSON.stringify({conditions: e.conditions, observed: e.observed}, null, 2))}</pre></div>`).join("")}${(r.outcome_verification.limitations || []).map(x => `<p>${esc(x)}</p>`).join("")}</details>` : ""}</section>`;
 }
@@ -105,6 +106,8 @@ function evidence(r) {
               return phase === "before" && row !== state.evidence[0] ? `<details class="spacer"><summary>Inspect state before this action</summary>${figure}</details>` : figure;
       }).join("");
       return `<article class="journey-step"><div class="journey-step-heading"><span class="journey-number">${esc(row.step)}</span><div><h3>${esc(row.action || "Recorded interaction")}${row.target_label ? ` · ${esc(row.target_label)}` : ""}</h3><small>${elapsed(row.elapsed_seconds)} · ${esc(row.result || "Result not recorded")}</small></div></div>
+        <small>Action status: ${esc(row.action_status || "Legacy — dispatch not recorded")} · Dispatch: ${esc(row.dispatch_state || "Not recorded")}</small>
+        ${row.evidence_gaps?.length ? `<div class="hint warning spacer"><strong>Incomplete evidence</strong>${row.evidence_gaps.map(g => `<p>${esc(g)}</p>`).join("")}</div>` : ""}
         ${row.reason ? `<p class="muted spacer"><strong>Agent's stated intention:</strong> ${esc(row.reason)}</p>` : ""}
         ${issues.length ? `<div class="hint spacer"><strong>Associated candidate issues</strong>${issues.map(f => `<p>OM-${f.number} · ${esc(f.issue)} <span class="badge">${esc(f.severity)}</span></p>`).join("")}</div>` : ""}
         ${captures}</article>`;

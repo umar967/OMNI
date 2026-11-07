@@ -1,7 +1,8 @@
 """Run the selected persona against a real page and retain its interaction journal."""
 import time
 import os
-from urllib.parse import urlsplit
+from Backend.action_journal import ActionJournal
+from Backend.action_safety import install_navigation_guard
 
 from playwright.sync_api import sync_playwright
 from Backend.explore_website import observe, execute, release
@@ -22,6 +23,8 @@ def run_live(item_id, plan, progress):
                    review_criteria=[c for c in plan['cases'] if c['selected']])
     db.write(folder / 'persona.json', dict(persona, runtime_profile=runtime.model_dump()))
     history = []
+    journal = ActionJournal(folder / 'history.json', history)
+    journal.flush()
     report = dict(persona=persona['name'], run_id=item_id, created_at=db.now(),
                   task=plan['instructions'], url=plan['url'], project_id=plan['project_id'],
                   persona_id=plan['persona_id'], findings=[], persona_feedback=None,
@@ -35,7 +38,7 @@ def run_live(item_id, plan, progress):
                                'DOM observations do not assess visual layout or contrast.'])
     attach_verification(report, contract, unverified('No endpoint inspection has run yet.'))
     db.write(folder / 'report.json', report)
-    started = time.monotonic()
+    started = journal.started
     stop_reason = 'Action limit reached; remaining areas are untested.'
     model_failed = False
     try:
@@ -45,17 +48,7 @@ def run_live(item_id, plan, progress):
                 context = browser.new_context(viewport={'width':1366, 'height':768})
                 context.set_default_timeout(6000)
                 context.set_default_navigation_timeout(30000)
-                origin = urlsplit(plan['url'])
-                def guard(route):
-                    target = urlsplit(route.request.url)
-                    # Never let a tested website navigate into OMNI's own API.
-                    workspace = target.hostname in ('localhost', '127.0.0.1') and target.port == 8000
-                    if workspace or (route.request.is_navigation_request() and
-                                     (target.scheme, target.netloc) != (origin.scheme, origin.netloc)):
-                        route.abort()
-                    else:
-                        route.continue_()
-                context.route('**/*', guard)
+                install_navigation_guard(context, plan['url'])
                 page = context.new_page()
                 context.on('page', lambda popup: popup.close())
                 page.on('dialog', lambda dialog: dialog.dismiss())
@@ -66,43 +59,23 @@ def run_live(item_id, plan, progress):
                     try:
                         progress(item_id, f'Step {step}: persona is deciding what to do.', stage='exploring')
                         decision = explore_next(persona, before, history)
+                        row = journal.begin(step, before, decision, round(time.monotonic()-started, 2))
                         target = handles.get(decision.get('target'))
-                        label = next((c['name'] for c in before['controls'] if c['id'] == decision.get('target')), '')
-                        images = {}
-                        capture_metadata = {}
-                        for phase in ('before',):
-                            try:
-                                capture_metadata[phase] = {'elapsed_seconds': round(time.monotonic()-started, 2)}
-                                images[phase] = capture_step(page, folder, step, phase, target, capture_metadata[phase])
-                                capture_metadata[phase]['elapsed_seconds'] = round(time.monotonic()-started, 2)
-                            except Exception:
-                                progress(item_id, f'Step {step}: screenshot capture unavailable; interaction evidence will still be saved.')
-                        result, error = 'agent_stopped', None
-                        if decision.get('action') != 'stop':
-                            try:
-                                result = execute(page, decision, before, handles, plan['url'])
-                            except Exception:
-                                result, error = 'automation_error', 'Browser action could not be completed.'
+                        journal.capture(row, page, folder, 'before', capture_step, target)
+                        result = journal.execute(row, execute, page, handles, plan['url'])
                         page.wait_for_timeout(1000)
-                        try:
-                            capture_metadata['after'] = {}
-                            images['after'] = capture_step(page, folder, step, 'after', target, capture_metadata['after'])
-                            capture_metadata['after']['elapsed_seconds'] = round(time.monotonic()-started, 2)
-                        except Exception:
-                            progress(item_id, f'Step {step}: after screenshot unavailable.')
-                        after, after_handles = observe(page)
-                        release(after_handles)
-                        history.append(dict(step=step, elapsed_seconds=round(time.monotonic()-started, 2),
-                                            before=before, after=after, decision=decision, result=result,
-                                            automation_error=error,
-                                            screenshots=images, capture_metadata=capture_metadata, target_label=label,
-                                            observed_change={k: before[k] != after[k] for k in before}))
-                        db.write(folder / 'history.json', history)
+                        journal.observe_after(row, page, observe, release)
+                        journal.capture(row, page, folder, 'after', capture_step)
                         verification = verify(page, contract, step=step)
                         attach_verification(report, contract, verification)
                         report['actions_recorded'] = len(history)
                         db.write(folder / 'report.json', report)
                         progress(item_id, f'Step {step}: {decision.get("action")} — {result}.', stage='exploring')
+                        if result == 'outcome_unknown':
+                            stop_reason = 'Uncertain action dispatch; automatic retries disabled.'
+                            break
+                        if result.startswith('refresh_required:'):
+                            continue  # A new observation gets new IDs and handles.
                         if verification.task_outcome == 'verified_complete':
                             report['execution_status'] = 'finished'
                             stop_reason = 'Configured observable endpoint independently verified.'
@@ -111,7 +84,7 @@ def run_live(item_id, plan, progress):
                             report['execution_status'] = 'finished'
                             stop_reason = 'Persona stopped: ' + decision.get('reason', '')
                             break
-                        if result.startswith('blocked:'):
+                        if result.startswith('blocked:') or result == 'automation_error':
                             stop_reason = 'Reached an exploration boundary: ' + result
                             report['limitations'].append(stop_reason)
                             break
@@ -149,7 +122,8 @@ def run_live(item_id, plan, progress):
     else:
         report['run_status'] = 'finished'
     report['stop_reason'] = stop_reason
-    db.write(folder / 'history.json', history)
+    report['actions_recorded'] = len(history)
+    journal.flush()
     if history and not model_failed:
         progress(item_id, 'Writing persona feedback from the recorded visit.', stage='reviewing')
         try:

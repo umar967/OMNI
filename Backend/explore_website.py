@@ -4,11 +4,13 @@ from datetime import datetime
 import json
 import os
 from pathlib import Path
-import re
 import time
 from urllib.parse import urlparse
 from playwright.sync_api import sync_playwright
 from Backend.flow_coverage import assess_flows
+from Backend.action_journal import ActionJournal, atomic_json
+from Backend.action_safety import snapshot, execute_validated, install_navigation_guard
+from Backend.app.visual_evidence import capture_step
 from Backend.agents.gemini_requests import ModelRequestError
 from Backend.persona_engine.resolver import resolve_persona, agent_persona
 from Backend.task_outcomes import TaskContract, verify, unverified, attach_verification
@@ -17,12 +19,10 @@ ROOT = Path(__file__).resolve().parent
 SELECTOR = ('button, a[href], input:not([type="hidden"]), textarea, select, '
             '[role="button"], [role="link"], [role="tab"], [role="checkbox"], '
             '[role="radio"], [contenteditable="true"]')
-RESTRICTED = re.compile(r'\b(check\s*out|place order|pay|buy now|purchase|subscribe|send|'
-                        r'delete|sign\s*up|register|create account|log\s*in|sign\s*in|submit)\b', re.I)
 
 
 def save(path, data):
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding='utf-8')
+    atomic_json(path, data)
 
 
 def observe(page):
@@ -77,6 +77,11 @@ def observe(page):
             element.dispose()
             continue
         index = len(controls)
+        data['target_snapshot'] = snapshot(element)
+        # Use the same semantic sample for the decision and later revalidation.
+        for key in ('tag', 'type', 'name'):
+            data[key] = data['target_snapshot']['semantic'][key]
+        data['disabled'] = not data['target_snapshot']['enabled']
         data['id'] = index
         controls.append(data)
         handles[index] = element
@@ -107,90 +112,21 @@ def release(handles):
             pass  # Navigation may already have destroyed the document.
 
 
-def execute(page, decision, observation, handles, home):
-    action, value = decision.get('action'), decision.get('value', '')
-    if action == 'scroll':
-        if value not in {'up', 'down'}:
-            raise ValueError('Scroll value must be up or down')
-        page.mouse.wheel(0, (1 if value == 'down' else -1) * 550)
-        return 'executed'
-    if action == 'back':
-        page.go_back(wait_until='domcontentloaded')
-        return 'executed'
-    if action == 'home':
-        page.goto(home, wait_until='domcontentloaded')
-        return 'executed'
-    if action == 'wait':
-        page.wait_for_timeout(1500)
-        return 'executed'
-    if action == 'press' and value == 'Escape':
-        page.keyboard.press('Escape')
-        return 'executed'
-    if action not in {'click', 'fill', 'select', 'check', 'hover', 'press'}:
-        raise ValueError(f'Unsupported action: {action}')
-    index = decision.get('target')
-    if type(index) is not int or index not in handles:
-        raise ValueError('Target was not in the current observation')
-    control = next(c for c in observation['controls'] if c['id'] == index)
-    element = handles[index]
-    if control['disabled']:
-        return 'blocked: disabled control'
-    if action == 'click':
-        # Account links may be opened for inspection; their submissions stay blocked.
-        account_link = control['tag'] == 'a' and re.search(
-            r'\b(log\s*in|sign\s*in|sign\s*up|register|create account)\b', control['name'], re.I)
-        if RESTRICTED.search(control['name']) and not account_link:
-            return 'blocked: account/submission/checkout boundary, not a website defect'
-        submit = element.evaluate('''el => !!el.form &&
-            ((el.tagName === 'BUTTON' && el.type === 'submit') ||
-             (el.tagName === 'INPUT' && ['submit','image'].includes(el.type)))''')
-        reversible = re.search(r'\b(search|add\s+to\s+(?:cart|bag|basket))\b', control['name'], re.I)
-        if submit and not reversible:
-            return 'blocked: form submission requires a dedicated test setup'
-    if action == 'fill' and control['type'] in {'password', 'file', 'hidden'}:
-        return 'blocked: credential/file input outside this exploration'
-    if action == 'press':
-        if value != 'Enter' or control['tag'] != 'input' or not (
-            control['type'] == 'search' or re.search(r'\bsearch\b', control['name'], re.I)
-        ):
-            return 'blocked: Enter is only enabled on identified search inputs'
-    element.scroll_into_view_if_needed()
-    element.evaluate('''el => {
-        const old = el.style.outline; el.style.outline = '3px solid #e8790b';
-        setTimeout(() => {el.style.outline = old;}, 800);
-    }''')
-    box = element.bounding_box()
-    if box:
-        page.mouse.move(box['x'] + box['width']/2, box['y'] + box['height']/2, steps=12)
-    page.wait_for_timeout(500)
-    if action == 'click':
-        element.click(timeout=6000)
-    elif action == 'hover':
-        element.hover(timeout=6000)
-    elif action == 'fill':
-        if not isinstance(value, str) or len(value) > 500:
-            raise ValueError('Fill requires at most 500 characters')
-        element.fill(value, timeout=6000)
-    elif action == 'select':
-        element.select_option(value=value, timeout=6000)
-    elif action == 'check':
-        if value not in {'true', 'false'}:
-            raise ValueError('Check value must be true or false')
-        element.set_checked(value == 'true', timeout=6000)
-    elif action == 'press':
-        element.press('Enter', timeout=6000)
-    return 'executed'
+def execute(page, decision, observation, handles, home, on_dispatch=lambda: None):
+    return execute_validated(page, decision, observation, handles, home, on_dispatch)
 
 
 def coverage(history, catalog):
     observed, attempted = set(), set()
     for row in history:
-        for state in (row['before'], row['after']):
+        for state in (row['before'], row.get('after', {})):
+            if not state:
+                continue
             observed.update((state['url'], c['tag'], c['name']) for c in state['controls'])
         for c in row['before']['controls']:
             if c['id'] == row['decision'].get('target'):
                 attempted.add((row['before']['url'], c['tag'], c['name']))
-    return {'pages_observed': sorted({s['url'] for r in history for s in (r['before'], r['after'])}),
+    return {'pages_observed': sorted({s['url'] for r in history for s in (r['before'], r.get('after', {})) if s.get('url')}),
             'areas_attempted': sorted({r['decision'].get('area', 'Unknown') for r in history}),
             'flows': assess_flows(history, catalog),
             'observed_controls_not_targeted': [list(c) for c in sorted(observed - attempted)],
@@ -241,6 +177,10 @@ def main():
         previous_report = json.loads((run_dir / 'report.json').read_text(encoding='utf-8'))
         events = previous_report.get('events', [])
 
+        if any(r.get('action_status') == 'outcome_unknown' or
+               (not r.get('journal_version') and r.get('result') == 'automation_error') for r in history):
+            parser.error('Cannot automatically resume after uncertain dispatch; inspect the saved evidence first.')
+
         if not history:
             parser.error('Cannot resume a run with no recorded actions')
         if len(history) >= args.max_actions:
@@ -281,7 +221,9 @@ def main():
     save(run_dir / 'report.json', initial_report)
     stop_reason = 'Action limit reached; remaining areas are untested.'
     model_failed = False
-    started = time.monotonic()
+    journal = ActionJournal(run_dir / 'history.json', history)
+    journal.flush()
+    started = journal.started
     print(f"Persona: {persona['name']} | Provider: {args.provider} | Limit: {args.max_actions} actions\nResults: {run_dir}", flush=True)
     print('Each decision calls the chosen model. Ctrl+C stops exploration and saves progress.', flush=True)
     with sync_playwright() as p:
@@ -299,14 +241,7 @@ def main():
         context = browser.new_context(**context_options)
         context.set_default_timeout(6000)
         context.set_default_navigation_timeout(15000)
-        def route_request(route):
-            request = route.request
-            if request.is_navigation_request() and urlparse(request.url).netloc != urlparse(args.url).netloc:
-                events.append({'type': 'boundary', 'message': 'External navigation blocked', 'url': request.url})
-                route.abort()
-            else:
-                route.continue_()
-        context.route('**/*', route_request)
+        install_navigation_guard(context, args.url)
         page = context.new_page()
         def close_popup(popup):
             events.append({'type': 'limitation', 'message': 'New tab closed; popup flow untested'})
@@ -317,7 +252,7 @@ def main():
             dialog.dismiss()
         page.on('dialog', dismiss_dialog)
         try:
-            resume_url = history[-1]['after']['url'] if args.resume else args.url
+            resume_url = (history[-1].get('after') or history[-1]['before'])['url'] if args.resume else args.url
             page.goto(resume_url, wait_until='domcontentloaded')
             page.wait_for_timeout(1000)
             for step in range(len(history) + 1, args.max_actions + 1):
@@ -326,20 +261,13 @@ def main():
                     print(f'\n[{step}/{args.max_actions}] Asking persona...', flush=True)
                     decision = explore_next(persona, before, history)
                     print(f"{decision.get('action')} target={decision.get('target')} | {decision.get('reason')}", flush=True)
-                    result, error = 'agent_stopped', None
-                    if decision.get('action') != 'stop':
-                        try:
-                            result = execute(page, decision, before, handles, args.url)
-                        except Exception as exc:
-                            result, error = 'automation_error', str(exc)
+                    row = journal.begin(step, before, decision, round(time.monotonic() - started, 2))
+                    target = handles.get(decision.get('target'))
+                    journal.capture(row, page, run_dir, 'before', capture_step, target)
+                    result = journal.execute(row, execute, page, handles, args.url)
                     page.wait_for_timeout(1000)
-                    after, after_handles = observe(page)
-                    release(after_handles)
-                    row = {'step': step, 'elapsed_seconds': round(time.monotonic() - started, 2),
-                           'before': before, 'decision': decision, 'result': result,
-                           'automation_error': error, 'after': after,
-                           'observed_change': {k: before[k] != after[k] for k in before}}
-                    history.append(row)
+                    journal.observe_after(row, page, observe, release)
+                    journal.capture(row, page, run_dir, 'after', capture_step)
                     verification = verify(page, contract, step=step)
                     save(run_dir / 'history.json', history)
                     context.storage_state(path=str(run_dir / 'browser_state.json'))
@@ -354,6 +282,14 @@ def main():
                     attach_verification(progress_report, contract, verification)
                     save(run_dir / 'report.json', progress_report)
                     print(f"Result: {result}; changes: {row['observed_change']}", flush=True)
+                    if result == 'outcome_unknown':
+                        stop_reason = 'Uncertain action dispatch; automatic retries disabled.'
+                        break
+                    if result.startswith('refresh_required:'):
+                        continue  # Observe anew; never rebind the old ID.
+                    if result.startswith('blocked:') or result == 'automation_error':
+                        stop_reason = 'Execution boundary: ' + result
+                        break
                     if verification.task_outcome == 'verified_complete':
                         execution_status = 'finished'
                         stop_reason = 'Configured observable endpoint independently verified.'
@@ -378,8 +314,14 @@ def main():
             model_failed = isinstance(exc, ModelRequestError)
             stop_reason = f'Execution/model error: {exc}'
         finally:
-            context.close()
-            browser.close()
+            try:
+                context.close()
+            except Exception:
+                pass
+            try:
+                browser.close()
+            except Exception:
+                pass
     report = {'persona': persona['name'], 'stop_reason': stop_reason,
               'run_status': 'failed' if execution_status in ('failed', 'cancelled') or model_failed else 'finished',
               'execution_status': execution_status, 'task': contract.description,

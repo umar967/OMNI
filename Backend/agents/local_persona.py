@@ -54,7 +54,7 @@ Use reason under EIGHT words. Return only compact JSON.'''
 def experience(persona, history, request, verification=None):
     records = []
     for row in history:
-        if row['result'] != 'executed':
+        if row['result'] != 'executed' or not row.get('after'):
             continue
         d = row['decision']
         label = next((c['name'] for c in row['before']['controls'] if c['id'] == d.get('target')), '')

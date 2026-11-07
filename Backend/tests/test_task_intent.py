@@ -2,7 +2,7 @@
 import unittest
 from unittest.mock import Mock, MagicMock
 from Backend.agents.local_persona import next_action
-from Backend.explore_website import execute
+from Backend.action_safety import validate
 
 
 class TaskIntentTests(unittest.TestCase):
@@ -20,17 +20,12 @@ class TaskIntentTests(unittest.TestCase):
         self.assertIn('Follow same-site links', prompt)
 
     def test_cart_form_button_is_allowed_but_checkout_stays_blocked(self):
-        page, element = MagicMock(), MagicMock()
-        element.evaluate.return_value = True
-        element.bounding_box.return_value = None
-        decision = {'action':'click', 'target':1, 'value':''}
-        control = {'id':1, 'name':'Add to cart', 'tag':'button', 'type':'submit', 'disabled':False}
-        self.assertEqual(execute(page, decision, {'controls':[control]}, {1:element}, 'http://localhost:5173/'), 'executed')
-        element.click.assert_called_once()
-        element.reset_mock()
-        control['name'] = 'Checkout'
-        self.assertTrue(execute(page, decision, {'controls':[control]}, {1:element}, 'http://localhost:5173/').startswith('blocked:'))
-        element.click.assert_not_called()
+        current = {'identity':'test:1', 'connected':True, 'visible':True, 'enabled':True,
+                   'semantic':{'name':'Add to cart', 'tag':'button', 'type':'submit',
+                               'form':{'action':'http://localhost:5173/cart', 'target':'', 'credentials':False}}}
+        self.assertIsNone(validate(current, current, 'click', '', 'http://localhost:5173/'))
+        current['semantic']['name'] = 'Checkout'
+        self.assertTrue(validate(current, current, 'click', '', 'http://localhost:5173/').startswith('blocked:'))
 
     def test_recent_action_memory_retains_cart_confirmation(self):
         request = Mock(return_value={'action':'click','target':6,'value':'','reason':'Verify cart'})

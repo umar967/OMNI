@@ -24,10 +24,12 @@ def compact_history(history):
             'target': target, 'value': decision.get('value'),
             'reason': decision.get('reason'), 'area': decision.get('area'),
             'result': row['result'], 'automation_error': row.get('automation_error'),
-            'before_url': row['before']['url'], 'after_url': row['after']['url'],
+            'before_url': row['before']['url'], 'after_url': row.get('after', {}).get('url'),
             'before_text': row['before']['visible_text'][:1200],
-            'after_text': row['after']['visible_text'][:1200],
+            'after_text': row.get('after', {}).get('visible_text', '')[:1200],
             'observed_change': row['observed_change'],
+            'action_status': row.get('action_status', 'legacy_unverified'),
+            'after_observation_available': bool(row.get('after')),
         })
     return result
 
@@ -42,7 +44,7 @@ def clean_review(review, history):
             return False
         steps = item.get('steps', [])
         if (not steps or not all(type(step) is int and step in rows and
-                                 rows[step]['result'] == 'executed'
+                                 rows[step]['result'] == 'executed' and bool(rows[step].get('after'))
                                  for step in steps)):
             return False
         quote = ' '.join(str(item.get('evidence', '')).split()).casefold()
@@ -207,6 +209,11 @@ def request_json(prompt, schema):
 
 
 def explore_next(persona, observation, history):
+    # Internal identity/form signatures belong to deterministic validation, not
+    # the model prompt (and can be large on pages with many form fields).
+    observation = {**observation, 'controls': [
+        {k: v for k, v in control.items() if k != 'target_snapshot'}
+        for control in observation['controls']]}
     if os.getenv('OMNI_MODEL_PROVIDER', 'gemini').lower() == 'ollama':
         from .local_persona import next_action
         return next_action(persona, observation, history, request_json)

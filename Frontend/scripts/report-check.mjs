@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 globalThis.localStorage = { getItem: () => null };
 const { state } = await import('../src/state.js');
-const { report } = await import('../src/pages/reports.js');
+const { report, reportRows } = await import('../src/pages/reports.js');
 state.report = { kind: 'exploration', persona: 'Visitor', findings: [],
   journey_summary: {text: 'Recorded task <example>', outcome: 'Completion not verified'},
   review_status: 'not_completed' };
@@ -36,3 +36,14 @@ html = report();
 assert.ok(html.includes('Review cases'));
 assert.ok(!html.includes('Persona journey evidence'));
 console.log('Report rendering checks passed: legacy reports, evidence gaps, duplicate captures and screenshot reviews.');
+
+state.report = {kind: 'exploration', persona: 'Visitor', findings: [], evidence_incomplete: true};
+state.reportTab = 'Evidence';
+state.evidence = [{step: 1, action: 'click', action_status: 'outcome_unknown', dispatch_state: 'started',
+  evidence_gaps: ['After-observation unavailable; resulting page state is unknown.'], before: {}, after: {}}];
+html = report();
+assert.ok(html.includes('outcome_unknown'));
+assert.ok(html.includes('Incomplete evidence'));
+assert.ok(html.includes('resulting page state is unknown'));
+assert.ok(reportRows([state.report]).includes('Incomplete evidence'));
+console.log('Action journal rendering checks passed: uncertain dispatch, missing observations and library warning.');

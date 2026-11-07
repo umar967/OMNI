@@ -9,6 +9,7 @@ from pathlib import Path
 from .journey import journey_summary
 from Backend.persona_engine.resolver import compatibility_record
 from Backend.task_outcomes import outcome_view
+from Backend.action_journal import atomic_json, evidence_gaps
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.getenv('OMNI_DATA_DIR', DEFAULT_ROOT)).resolve()
@@ -35,10 +36,8 @@ def read(path):
 
 def write(path, data):
     with LOCK:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        temp = path.with_name(path.name + '.' + identifier() + '.tmp')
-        temp.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding='utf-8')
-        temp.replace(path)
+        atomic_json(path, data)
+
 
 def records(folder):
     with LOCK:
@@ -81,9 +80,12 @@ def reports():
             history = []
             if history_path.is_file():
                 history=read(history_path)
+                report['actions_recorded'] = len(history)
                 report['actions_executed'] = sum(row.get('result') == 'executed' for row in history)
                 if history:
                     report.setdefault('url',history[0].get('before',{}).get('url'))
+            report['evidence_incomplete'] = not history or any(evidence_gaps(row, p.parent) for row in history)
+            report['journal_status'] = 'durable' if history and all(r.get('journal_version') for r in history) else 'legacy_unverified'
             report['journey_summary'] = journey_summary(report, history)
             report['summary'] = (report.get('experience_summary') or {}).get('comment') or report['journey_summary']['text']
             snapshot=p.parent/'persona.json'
@@ -112,5 +114,5 @@ def report_evidence(item_id):
             filename = f'step-{row.get("step")}-{phase}.png'
             if row.get('screenshots', {}).get(phase) == filename and (path.parent/'evidence'/filename).is_file():
                 images[phase] = f'/api/reports/{item_id}/evidence/{filename}'
-        rows.append(dict(states,step=row.get('step'),elapsed_seconds=row.get('elapsed_seconds'),capture_metadata=row.get('capture_metadata',{}),action=decision.get('action'),reason=decision.get('reason'),result=row.get('result'),observed_change=row.get('observed_change',{}),screenshots=images,target_label=row.get('target_label','')))
+        rows.append(dict(states,action_status=row.get('action_status', 'legacy_unverified'),dispatch_state=row.get('dispatch_state', 'not_recorded'),evidence_gaps=evidence_gaps(row, path.parent),evidence_errors=row.get('evidence_errors',{}),step=row.get('step'),elapsed_seconds=row.get('elapsed_seconds'),capture_metadata=row.get('capture_metadata',{}),action=decision.get('action'),reason=decision.get('reason'),result=row.get('result'),observed_change=row.get('observed_change',{}),screenshots=images,target_label=row.get('target_label','')))
     return rows

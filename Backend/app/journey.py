@@ -18,7 +18,7 @@ def journey_summary(report, history):
             sentences.append('The recorded sequence included ' + '; '.join(labels[:4]) + '.')
         failed = [r for r in attempted if r.get('result') != 'executed']
         if failed:
-            sentences.append('Some actions were blocked or could not execute (steps ' + ', '.join(str(r.get('step')) for r in failed) + '); these are execution limitations, not confirmed website defects.')
+            sentences.append('Some actions were blocked, not dispatched or have uncertain execution (steps ' + ', '.join(str(r.get('step')) for r in failed) + '); these are execution limitations, not confirmed website defects.')
         unchanged = [r for r in executed if r.get('observed_change') and not any(r['observed_change'].values())]
         if unchanged:
             sentences.append('No measured state change followed steps ' + ', '.join(str(r.get('step')) for r in unchanged) + '; this alone does not establish user difficulty.')
