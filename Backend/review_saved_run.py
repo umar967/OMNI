@@ -29,9 +29,9 @@ def main():
     report['actions_recorded'] = len(history)
     print(f"Reviewing {len(history)} saved actions with {args.provider}...", flush=True)
     try:
-        review = clean_review(review_run(persona, history), history)
+        review = clean_review(review_run(persona, history, report.get('outcome_verification')), history)
     except Exception as exc:
-        report['review_status'] = 'not_completed'
+        report['review_status'] = 'unavailable'
         report['review_error'] = str(exc)
         report_path.write_text(json.dumps(report, indent=2, ensure_ascii=False), encoding='utf-8')
         raise SystemExit(f'Review did not finish: {exc}')

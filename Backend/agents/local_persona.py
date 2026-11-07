@@ -51,7 +51,7 @@ Use reason under EIGHT words. Return only compact JSON.'''
     return result
 
 
-def experience(persona, history, request):
+def experience(persona, history, request, verification=None):
     records = []
     for row in history:
         if row['result'] != 'executed':
@@ -78,6 +78,8 @@ def experience(persona, history, request):
     raw = request(f'''Write brief first-person simulated visitor feedback.
 Persona: {json.dumps(brief)}
 Executed interactions: {json.dumps(records, separators=(',',':'))}
+Independent endpoint outcome: {json.dumps(verification)}
+Do not contradict the independent result or claim broader task completion.
 Trace endings and limitations: {json.dumps([{'step':r['step'], 'action':r['decision'].get('action'), 'result':r['result']} for r in history])}
 experience_summary: 70–120 words in third person about this execution's goal,
 navigation, observed difficulties, recorded recovery attempts and ending.

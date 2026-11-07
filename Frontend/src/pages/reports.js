@@ -7,7 +7,7 @@ const feedbackCount = (r) => {
   const f = r.persona_feedback || {};
   return (f.overall_impression ? 1 : 0) + ["what_worked_well", "difficult_moments", "suggested_improvements"].reduce((n, key) => n + (f[key]?.length || 0), 0);
 };
-const reviewLabel = (value) => value === "completed" ? "Reviewed" : value === "not_completed" ? "Review incomplete" : value || "Not recorded";
+const reviewLabel = (value) => value === "completed" ? "Reviewed" : ["partial", "not_completed"].includes(value) ? "Review incomplete" : value === "unavailable" ? "Review unavailable" : value || "Not recorded";
 const title = (r) => exploration(r) ? `Browser exploration · ${r.actions_recorded || 0} recorded actions` : r.task || r.id;
 
 export function reportRows(records) {
@@ -81,7 +81,8 @@ function experienceSummary(r) {
   return `<section class="experience-summary"><div class="sectionhead"><h2>Persona experience</h2><span class="badge">${summary ? "AI interpretation" : "Recorded journey"}</span></div>
     <p>${esc(summary?.comment || trace?.text || "No execution summary is available for this report.")}</p>
     ${summary ? `<small>Based on steps ${esc(summary.steps.join(", "))}. References are checked; the interpretation still needs human review.</small>` : ""}
-    <div class="journey-outcome"><div><small>Task outcome</small><h3>${esc(trace?.outcome || "Completion not verified")}</h3></div><div><small>Session ending</small><p>${esc(trace?.stop_reason || r.stop_reason || "Not recorded")}</p></div></div></section>`;
+    <div class="journey-outcome"><div><small>Task outcome</small><h3>${esc(trace?.outcome || "Completion not verified")}</h3></div><div><small>Session ending</small><p>${esc(trace?.stop_reason || r.stop_reason || "Not recorded")}</p></div></div>
+    ${r.outcome_verification ? `<details class="hint spacer"><summary>Independent endpoint verification</summary><p>${esc(r.outcome_verification.reason)}</p><p>Execution: ${esc(r.execution_status || "Not recorded")}</p>${(r.outcome_verification.evidence || []).map(e => `<div id="verification-${esc(e.id)}"><small>Evidence ${esc(e.id)} · ${esc(e.at)} · ${e.step ? `step ${esc(e.step)}` : "endpoint inspection"}</small><pre>${esc(JSON.stringify({conditions: e.conditions, observed: e.observed}, null, 2))}</pre></div>`).join("")}${(r.outcome_verification.limitations || []).map(x => `<p>${esc(x)}</p>`).join("")}</details>` : ""}</section>`;
 }
 
 function evidence(r) {

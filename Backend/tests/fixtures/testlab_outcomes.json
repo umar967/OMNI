@@ -1,0 +1,47 @@
+[
+  {
+    "description": "Open the product listing and observe products",
+    "endpoint": {
+      "strategy": "product_listing",
+      "expected_url": "http://127.0.0.1:5173/products",
+      "container_selector": ".products-page",
+      "ready_selector": ".catalog-result-line [role='status']",
+      "item_selector": ".product-card",
+      "name_selector": ".product-name",
+      "empty_selector": ".empty-state",
+      "complete_collection": true
+    }
+  },
+  {
+    "description": "Search for Arc Table Lamp and observe its result",
+    "endpoint": {
+      "strategy": "product_search",
+      "expected_url": "http://127.0.0.1:5173/products?q=Arc+Table+Lamp",
+      "container_selector": ".products-page",
+      "ready_selector": ".catalog-result-line [role='status']",
+      "item_selector": ".product-card",
+      "name_selector": ".product-name",
+      "product_name": "Arc Table Lamp",
+      "query_selector": ".catalog-search input",
+      "query_value": "Arc Table Lamp",
+      "empty_selector": ".empty-state",
+      "complete_collection": true
+    }
+  },
+  {
+    "description": "Add exactly one Arc Table Lamp and verify the cart",
+    "endpoint": {
+      "strategy": "cart_product",
+      "expected_url": "http://127.0.0.1:5173/cart",
+      "container_selector": ".cart-page, .cart-empty",
+      "ready_selector": ".cart-page, .cart-empty",
+      "item_selector": ".cart-item",
+      "name_selector": "h2",
+      "quantity_selector": "output",
+      "product_name": "Arc Table Lamp",
+      "empty_selector": ".empty-icon",
+      "complete_collection": true,
+      "only_requested_product": true
+    }
+  }
+]

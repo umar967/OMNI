@@ -254,6 +254,14 @@ and `POST /api/personas/validate` returns normalization and capability diagnosti
 See [the foundation contracts and compatibility guide](Backend/persona_engine/README.md).
 This milestone adds no behavioral simulation or fitted human calibration.
 
+### Independent Task Outcome Verification
+
+Live API plans accept an optional developer-authored `task_contract`; the CLI
+accepts `--task-contract`. Deterministic DOM checks support configured product
+listing, product search and exact single-product cart endpoints. Execution,
+task outcome and review statuses are separate. Tasks without a supported endpoint
+remain unverified regardless of model claims. See [configuration and limitations](Backend/TASK_OUTCOMES.md).
+
 ## Separate OMNI-TestLab folder
 
 OMNI-TestLab lives outside this repository, for example at `D:\FYP\OMNI-TestLab`.

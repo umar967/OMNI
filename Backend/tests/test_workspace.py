@@ -63,7 +63,7 @@ class WorkspaceTests(unittest.TestCase):
         self.assertEqual(report['kind'], 'exploration')
         self.assertEqual(report['task'], body['instructions'])
         self.assertEqual(report['actions_recorded'], 0)
-        self.assertEqual(report['review_status'], 'not_completed')
+        self.assertEqual(report['review_status'], 'unavailable')
         self.assertEqual(self.client.get('/api/reports/' + saved['report_id'] + '/evidence').json(), [])
         body['url'] = 'http://127.0.0.1:8000/'
         self.assertEqual(self.post('/api/plans', body).status_code, 400)

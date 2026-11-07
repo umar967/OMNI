@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from .journey import journey_summary
 from Backend.persona_engine.resolver import compatibility_record
+from Backend.task_outcomes import outcome_view
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.getenv('OMNI_DATA_DIR', DEFAULT_ROOT)).resolve()
@@ -69,6 +70,10 @@ def reports():
         report.setdefault('findings',[])
         report.update(id=item_id, kind='exploration' if is_exploration else 'screenshot',created_at=report.get('created_at') or datetime.fromtimestamp(p.stat().st_mtime, timezone.utc).isoformat(), imported=not bool(report.get('run_id')))
         if is_exploration:
+            report['task_outcome'] = outcome_view(report)[0]
+            report.setdefault('execution_status', 'finished' if report.get('run_status') == 'finished' else 'partial')
+            report.setdefault('outcome_verification', {'task_outcome': 'unknown', 'reason': outcome_view(report)[1],
+                                                      'evidence': [], 'limitations': ['Legacy report; no independent endpoint inspection.']})
             report['method']='Recorded browser exploration'
             report.setdefault('task','Explore the website')
             history_path=p.parent/'history.json'

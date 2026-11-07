@@ -1,6 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Literal
 from urllib.parse import urlsplit
+from Backend.task_outcomes import TaskContract
 
 def valid_url(value):
     u = urlsplit(value)
@@ -50,6 +51,7 @@ class PlanInput(BaseModel):
     max_actions: int = Field(default=4, ge=1, le=60)
     project_id: str | None = None
     mode: Literal['UX'] = 'UX'
+    task_contract: TaskContract | None = None
 
     @field_validator('url')
     @classmethod

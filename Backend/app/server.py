@@ -15,6 +15,7 @@ from PIL import Image
 from pydantic import ValidationError
 from Backend.persona_engine.schema import UniversalPersona
 from Backend.persona_engine.resolver import compatibility_record, resolve_persona, agent_persona, SKILLS
+from Backend.task_outcomes import TaskContract, attach_verification, unverified
 
 from Backend.agents.persona_agent import evaluate_ux
 from . import storage as db
@@ -202,6 +203,8 @@ def capture(body:CaptureInput):
 
 @app.post('/api/plans',status_code=201)
 def create_plan(body:PlanInput):
+    if body.task_contract and body.task_contract.description != body.instructions:
+        raise HTTPException(422, 'Task contract description must match the task instructions.')
     person = get_record('personas',body.persona_id)
     if body.method == 'screenshot':
         if not body.screenshot_id:
@@ -259,6 +262,9 @@ def evaluate_run(item_id,plan):
         progress(item_id,'Sent screenshot to Gemini. Waiting for evidence-based findings.',stage='analyzing')
         result = evaluate_ux(agent_persona(plan['persona'], plan['instructions']),task,path)
         result.update(id=item_id,run_id=item_id,created_at=db.now(),persona_id=plan['persona_id'],persona_snapshot=plan['persona'],task=plan['instructions'],url=plan['url'],mode='UX',project_id=plan['project_id'],screenshot_id=plan['screenshot_id'],cases=selected,model=os.getenv('GEMINI_MODEL','gemini-3.8-flash'),method='Gemini screenshot UX evaluation')
+        contract = TaskContract.model_validate(plan.get('task_contract') or {'description': plan['instructions']})
+        attach_verification(result, contract, unverified('Screenshot review does not inspect a live endpoint.', unsupported=contract.endpoint is not None))
+        result.update(execution_status='finished', review_status='completed')
         db.write(db.safe_file('results',item_id),result)
         progress(item_id,'Findings saved. Report is ready.',status='completed',stage='completed',report_id=item_id)
     except Exception as error:

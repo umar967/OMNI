@@ -10,9 +10,11 @@ from Backend.agents.gemini_requests import ModelRequestError
 from . import storage as db
 from .visual_evidence import capture_step
 from Backend.persona_engine.resolver import resolve_persona, agent_persona
+from Backend.task_outcomes import TaskContract, verify, unverified, attach_verification
 
 
 def run_live(item_id, plan, progress):
+    contract = TaskContract.model_validate(plan.get('task_contract') or {'description': plan['instructions']})
     folder = db.directory('results') / ('exploration_' + item_id)
     folder.mkdir(parents=True, exist_ok=True)
     runtime = resolve_persona(plan['persona'], plan['instructions']).require_supported()
@@ -25,11 +27,13 @@ def run_live(item_id, plan, progress):
                   persona_id=plan['persona_id'], findings=[], persona_feedback=None,
                   provider=os.getenv('OMNI_MODEL_PROVIDER', 'gemini'),
                   model=os.getenv('OLLAMA_MODEL', 'qwen3:4b') if os.getenv('OMNI_MODEL_PROVIDER', 'gemini').lower() == 'ollama' else os.getenv('GEMINI_MODEL', 'gemini-3.8-flash'),
-                  feedback_type='simulated_persona_experience', review_status='not_completed',
+                  feedback_type='simulated_persona_experience', review_status='unavailable',
+                  execution_status='partial',
                   run_status='running', actions_recorded=0,
                   limitations=['Persona reactions are simulated from recorded interactions.',
                                'Account submissions, payments, external navigation and popup flows are not tested.',
                                'DOM observations do not assess visual layout or contrast.'])
+    attach_verification(report, contract, unverified('No endpoint inspection has run yet.'))
     db.write(folder / 'report.json', report)
     started = time.monotonic()
     stop_reason = 'Action limit reached; remaining areas are untested.'
@@ -94,10 +98,17 @@ def run_live(item_id, plan, progress):
                                             screenshots=images, capture_metadata=capture_metadata, target_label=label,
                                             observed_change={k: before[k] != after[k] for k in before}))
                         db.write(folder / 'history.json', history)
+                        verification = verify(page, contract, step=step)
+                        attach_verification(report, contract, verification)
                         report['actions_recorded'] = len(history)
                         db.write(folder / 'report.json', report)
                         progress(item_id, f'Step {step}: {decision.get("action")} — {result}.', stage='exploring')
+                        if verification.task_outcome == 'verified_complete':
+                            report['execution_status'] = 'finished'
+                            stop_reason = 'Configured observable endpoint independently verified.'
+                            break
                         if decision.get('action') == 'stop':
+                            report['execution_status'] = 'finished'
                             stop_reason = 'Persona stopped: ' + decision.get('reason', '')
                             break
                         if result.startswith('blocked:'):
@@ -116,15 +127,25 @@ def run_live(item_id, plan, progress):
                             break
                     finally:
                         release(handles)
+                attach_verification(report, contract, verify(page, contract, step=len(history) or None, final=True))
             finally:
                 browser.close()
+    except KeyboardInterrupt:
+        stop_reason = 'Session cancelled; partial evidence retained.'
+        report['execution_status'] = 'cancelled'
+        report['run_status'] = 'failed'
+        attach_verification(report, contract, unverified('Session cancelled before final endpoint inspection.'))
     except ModelRequestError as exc:
         stop_reason = str(exc)
         model_failed = True
         report['run_status'] = 'failed'
+        report['execution_status'] = 'partial' if history else 'failed'
+        attach_verification(report, contract, unverified('Model failure prevented final endpoint inspection.'))
     except Exception:
         stop_reason = 'Browser or model execution failed; recorded actions remain available.'
         report['run_status'] = 'failed'
+        report['execution_status'] = 'partial' if history else 'failed'
+        attach_verification(report, contract, unverified('Execution failure prevented final endpoint inspection.'))
     else:
         report['run_status'] = 'finished'
     report['stop_reason'] = stop_reason
@@ -132,7 +153,7 @@ def run_live(item_id, plan, progress):
     if history and not model_failed:
         progress(item_id, 'Writing persona feedback from the recorded visit.', stage='reviewing')
         try:
-            apply_review(report, clean_review(review_run(persona, history), history))
+            apply_review(report, clean_review(review_run(persona, history, report['outcome_verification']), history))
         except ModelRequestError as exc:
             report['review_error'] = str(exc)
         except Exception:
