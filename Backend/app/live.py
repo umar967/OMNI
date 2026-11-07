@@ -127,7 +127,7 @@ def run_live(item_id, plan, progress):
     if history and not model_failed:
         progress(item_id, 'Writing persona feedback from the recorded visit.', stage='reviewing')
         try:
-            apply_review(report, clean_review(review_run(persona, history, report['outcome_verification']), history))
+            apply_review(report, clean_review(review_run(persona, history, report['outcome_verification']), history, report['outcome_verification'], folder))
         except ModelRequestError as exc:
             report['review_error'] = str(exc)
         except Exception:

@@ -23,10 +23,12 @@ class JourneyReportTests(unittest.TestCase):
         self.assertIn('not confirmed website defects', summary['text'])
         self.assertIn('No interaction trace', journey_summary({}, [])['text'])
 
-    def test_narrative_requires_valid_steps_quote_and_length(self):
+    def test_freeform_narrative_is_unverified_even_with_real_quote_and_length(self):
         candidate = review()
         candidate['experience_summary'] = {'comment': ' '.join(['Observed'] * 80), 'steps': [1], 'evidence': 'Explore the collection'}
-        self.assertIsNotNone(clean_review(candidate, [interaction()])['experience_summary'])
+        checked = clean_review(candidate, [interaction()])
+        self.assertIsNone(checked['experience_summary'])
+        self.assertEqual(checked['unsupported_claims'][0]['classification'], 'unsupported_assertion')
         candidate['experience_summary']['steps'] = [99]
         self.assertIsNone(clean_review(candidate, [interaction()])['experience_summary'])
         candidate['experience_summary']['steps'] = [1]

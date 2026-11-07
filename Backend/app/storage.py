@@ -10,6 +10,7 @@ from .journey import journey_summary
 from Backend.persona_engine.resolver import compatibility_record
 from Backend.task_outcomes import outcome_view
 from Backend.action_journal import atomic_json, evidence_gaps
+from Backend.finding_validation import report_claim_view
 
 DEFAULT_ROOT = Path(__file__).resolve().parents[1]
 ROOT = Path(os.getenv('OMNI_DATA_DIR', DEFAULT_ROOT)).resolve()
@@ -86,11 +87,15 @@ def reports():
                     report.setdefault('url',history[0].get('before',{}).get('url'))
             report['evidence_incomplete'] = not history or any(evidence_gaps(row, p.parent) for row in history)
             report['journal_status'] = 'durable' if history and all(r.get('journal_version') for r in history) else 'legacy_unverified'
+            report = report_claim_view(report, history, p.parent)
             report['journey_summary'] = journey_summary(report, history)
-            report['summary'] = (report.get('experience_summary') or {}).get('comment') or report['journey_summary']['text']
+            report['summary'] = report['journey_summary']['text']
             snapshot=p.parent/'persona.json'
             if snapshot.is_file():
                 report['persona_snapshot']=read(snapshot)
+        else:
+            report['claim_validation_status'] = 'unverified_screenshot_review'
+            report['claim_validation_note'] = 'Screenshot review assertions have not undergone browser claim-level verification.'
         result.append(report)
     return sorted(result, key=lambda r:r['created_at'], reverse=True)
 

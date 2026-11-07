@@ -47,3 +47,33 @@ assert.ok(html.includes('Incomplete evidence'));
 assert.ok(html.includes('resulting page state is unknown'));
 assert.ok(reportRows([state.report]).includes('Incomplete evidence'));
 console.log('Action journal rendering checks passed: uncertain dispatch, missing observations and library warning.');
+
+state.reportTab = 'Overview';
+state.report = {kind: 'exploration', persona: 'Visitor', review_status: 'completed', finding_validation_version: '1.0',
+  journey_summary: {outcome: 'Completion not verified', text: 'Recorded journey only'},
+  verified_observations: [{id: 'step-1-text-0', statement: 'Recorded page text: <error>', classification: 'observed_browser_event', affected_page: 'https://shop.test/form', limitations: ['Sample only']}],
+  findings: [{version: '1.0', classification: 'ux_hypothesis', validation_status: 'requires_developer_review',
+    category: 'error_recovery', issue: 'Review recovery guidance', affected_page: 'https://shop.test/form',
+    observed_symptom: ['Recorded error text'], hypothesis: 'An example could help.', potential_user_impact: 'May help recovery.',
+    expected_behavior: 'Show an example.', suggested_improvement: 'Add an email example.',
+    reproduction_steps: [{step: 1, action: 'click', control: 'Continue', url: 'https://shop.test/form', result: 'executed'}],
+    observation_ids: ['step-1-text-0'], supporting_evidence: [{source: 'screenshot', step: 1, phase: 'after', availability: 'missing'}],
+    limitations: ['Semantic relevance is not proven']}],
+  unsupported_claims: [{reason: 'Task outcomes cannot come from the model.', proposal: {issue: 'The task succeeded <script>'}}]};
+html = report();
+assert.ok(html.indexOf('Task outcome and recorded journey') < html.indexOf('Verified observations'));
+assert.ok(html.indexOf('Verified observations') < html.indexOf('Potential UX issues'));
+assert.ok(html.includes('UX hypothesis · Developer review required'));
+assert.ok(html.includes('Reproduction steps from the recorded run'));
+assert.ok(html.includes('Before/after evidence'));
+assert.ok(html.includes('after screenshot: missing'));
+assert.ok(html.includes('Suggested improvement — proposed'));
+assert.ok(html.includes('Semantic accuracy has not been proven'));
+assert.ok(html.includes('Unsupported or unverified assertions'));
+assert.ok(html.includes('&lt;script&gt;'));
+assert.ok(!html.includes('<script>'));
+state.report.findings = [{issue: 'Legacy unsupported diagnosis', explanation: 'Model-declared conclusion'}];
+html = report();
+assert.ok(html.includes('Historical assertion: claim-level validation was not run.'));
+assert.ok(!html.includes('UX hypothesis · Developer review required'));
+console.log('Claim rendering checks passed: fact/hypothesis separation, reproduction, uncertainty, legacy assertions and escaping.');

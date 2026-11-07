@@ -29,7 +29,7 @@ def main():
     report['actions_recorded'] = len(history)
     print(f"Reviewing {len(history)} saved actions with {args.provider}...", flush=True)
     try:
-        review = clean_review(review_run(persona, history, report.get('outcome_verification')), history)
+        review = clean_review(review_run(persona, history, report.get('outcome_verification')), history, report.get('outcome_verification'), args.run)
     except Exception as exc:
         report['review_status'] = 'unavailable'
         report['review_error'] = str(exc)

@@ -340,7 +340,7 @@ def main():
     if history and not model_failed:
         print('\nReviewing the persona experience from saved interactions...', flush=True)
         try:
-            review = clean_review(review_run(persona, history, report['outcome_verification']), history)
+            review = clean_review(review_run(persona, history, report['outcome_verification']), history, report['outcome_verification'], run_dir)
             apply_review(report, review)
         except (Exception, KeyboardInterrupt) as exc:
             report['review_error'] = str(exc) or 'Review interrupted'

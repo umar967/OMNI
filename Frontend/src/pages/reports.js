@@ -36,20 +36,49 @@ export function filteredRows() {
     (!state.projectFilter || (state.projectFilter === "ungrouped" ? !r.project_id : r.project_id === state.projectFilter))));
 }
 
-function findings(r) {
-  if (!r.findings.length) return empty(exploration(r) && r.review_status !== "completed"
-    ? "The review did not complete. An empty findings list is not evidence that the website has no issues."
-    : "No issues were identified within the recorded evaluation scope.");
-  return r.findings.map((f, i) => `<article class="finding">
-    <span class="badge ${f.severity === "High" ? "fail" : f.severity === "Medium" ? "warn" : ""}">${esc(f.severity)}</span>
-    <small>${esc(f.category || "Candidate observation")} · OM-${i + 1}${f.steps?.length ? ` · Steps ${esc(f.steps.join(", "))}` : ""}</small>
-    <h3>${esc(f.issue)}</h3><p class="muted">${esc(f.explanation || f.potential_persona_impact || "")}</p>
-    <p class="spacer"><strong>Recorded evidence</strong><br>${esc(f.evidence)}</p>
+function claimDetails(r) {
+  if (!exploration(r)) return "";
+  const cited = new Set(r.findings.flatMap(f => f.observation_ids || []));
+  const facts = (r.verified_observations || []).filter(o => o.kind !== "control_observed" || cited.has(o.id));
+  return `<section class="spacer"><h2>Verified observations</h2><p class="muted">Narrow facts checked against recorded browser data. Quoted page text is not independently verified website content, and these observations alone do not establish UX defects.</p>
+    ${facts.map(o => `<details class="hint spacer" id="observation-${esc(o.id)}"><summary>${esc(o.statement)}</summary><small>${esc(o.classification)} · ${esc(o.id)}</small><p>${esc(o.affected_page)}</p>${(o.limitations || []).map(l => `<p>${esc(l)}</p>`).join("")}</details>`).join("") || empty("No claim-level observations are available for this report.")}
+    ${r.execution_limitations?.length ? `<div class="hint warning spacer"><h3>Execution and evidence limitations</h3><p>These are not established defects in the tested website.</p>${r.execution_limitations.map(x => `<p>${esc(x.statement)}</p>`).join("")}</div>` : ""}</section>`;
+}
 
+function unsupportedClaims(r) {
+  const historical = exploration(r) ? r.findings.filter(f => f.version !== "1.0" || f.classification !== "ux_hypothesis") : [];
+  const items = [...(r.unsupported_claims || []), ...historical.map(f => ({reason: "Historical assertion: claim-level validation was not run.", proposal: f}))];
+  if (exploration(r) && r.experience_summary) items.push({reason: "Unverified historical narrative; the recorded journey above is authoritative.", proposal: r.experience_summary});
+  return items.length ? `<details class="hint warning spacer"><summary>Unsupported or unverified assertions (${items.length})</summary><p>Excluded from verified observations and accepted UX hypotheses. Original text is retained for inspection, not endorsed.</p>${items.map(x => `<div class="spacer"><strong>${esc(x.reason)}</strong><pre>${esc(JSON.stringify(x.proposal, null, 2))}</pre></div>`).join("")}</details>` : "";
+}
+
+function findings(r) {
+  if (exploration(r)) {
+    const items = r.findings.filter(f => f.version === "1.0" && f.classification === "ux_hypothesis");
+    return items.length ? items.map(f => `<article class="finding">
+      <span class="badge warn">UX hypothesis · Developer review required</span><h3>${esc(f.issue)}</h3>
+      <small>${esc(f.category)} · ${esc(f.affected_page)}${f.affected_control_id != null ? ` · control ${esc(f.affected_control_id)}` : ""}</small>
+      <p class="spacer"><strong>Recorded symptom</strong></p>${f.observed_symptom.map(x => `<p>${esc(x)}</p>`).join("")}
+      <p class="spacer"><strong>Unverified interpretation</strong><br>${esc(f.hypothesis)}</p>
+      <p><strong>Potential impact — interpretation, not measurement</strong><br>${esc(f.potential_user_impact)}</p>
+      <p><strong>Proposed expected behavior</strong><br>${esc(f.expected_behavior)}</p>
+      <h4 class="spacer">Reproduction steps from the recorded run</h4><ol>${f.reproduction_steps.map(x => `<li>Step ${esc(x.step)}: ${esc(x.action)}${x.control ? ` on ${esc(x.control)}` : ""} · ${esc(x.url || "URL unavailable")} · ${esc(x.result)}${x.input_omitted ? " (entered value omitted)" : ""}</li>`).join("")}</ol>
+      <p class="spacer"><strong>Supporting observations</strong> ${f.observation_ids.map(id => `<a href="#observation-${esc(id)}" data-capture-ref="observation-${esc(id)}">${esc(id)}</a>`).join(", ")}</p>
+      <p><strong>Before/after evidence</strong></p>${f.supporting_evidence.filter(e => e.source === "screenshot").map(e => `<small>Step ${esc(e.step)} ${esc(e.phase)} screenshot: ${esc(e.availability)}<br></small>`).join("")}
+      ${btn("Inspect before/after evidence →", "report-tab", "link spacer", "Evidence")}
+      <p class="spacer"><strong>Suggested improvement — proposed</strong><br>${esc(f.suggested_improvement)}</p>
+      <details class="spacer"><summary>Validation scope and limitations</summary><p>Status: ${esc(f.validation_status)}. Semantic accuracy has not been proven.</p>${f.limitations.map(l => `<p>${esc(l)}</p>`).join("")}</details>
+    </article>`).join("") : empty(r.review_status === "completed" ? "No supported UX hypotheses were retained in this review. This does not prove the interface has no issues." : "No supported UX hypotheses are available. Review coverage and evidence limitations before drawing conclusions.");
+  }
+  if (!r.findings.length) return empty("No issues were identified within the recorded evaluation scope.");
+  return r.findings.map((f, i) => `<article class="finding"><span class="badge">Unverified model interpretation</span>
+    <small>OM-${i + 1} · ${esc(f.category || "Screenshot review")}</small><h3>${esc(f.issue)}</h3>
+    <p>${esc(f.explanation || f.potential_persona_impact || "")}</p><p><strong>Model-cited evidence (not claim-validated)</strong><br>${esc(f.evidence)}</p>
     ${btn("Inspect evidence →", "report-tab", "link spacer", "Evidence")}</article>`).join("");
 }
 
 function recommendations(r) {
+  if (exploration(r)) return "";
   const items = r.findings.map((f, i) => ({ ...f, number: i + 1 })).filter(f => f.recommendation);
   return items.length ? `<section class="spacer"><h2>Recommendations</h2>${items.map(f => `<div class="hint spacer"><strong>OM-${f.number} · ${esc(f.issue)}</strong><p>${esc(f.recommendation)}</p></div>`).join("")}</section>` : "";
 }
@@ -57,9 +86,9 @@ function recommendations(r) {
 function feedback(r) {
   const data = r.persona_feedback;
   if (!data) return exploration(r) ? `<div class="hint warning spacer"><strong>Persona feedback is unavailable</strong><p>${esc(r.review_error || r.stop_reason || "The model review did not finish.")}</p><p>${r.actions_recorded || 0} actions were recorded. Open Evidence to inspect them. No usability verdict was produced.</p></div>` : "";
-  return `<section class="spacer"><h2>Persona reflections</h2><p class="muted spacer">${esc(r.feedback_note || "AI-inferred reactions from recorded interactions, not measured human feelings.")}</p>
+  return `<section class="spacer"><h2>Additional UX interpretations</h2><p class="muted spacer">${esc(r.feedback_note || "AI-inferred reactions from recorded interactions, not measured human feelings.")}</p>
     ${[["Overall impression", data.overall_impression ? [data.overall_impression] : []], ["What worked well", data.what_worked_well], ["Difficult moments", data.difficult_moments], ["Suggested improvements", data.suggested_improvements]].map(([label, items]) =>
-      items?.length ? `<div class="finding"><h3>${label}</h3>${items.map((item) => `<p class="spacer">${esc(item.comment)}</p><small>Steps ${esc((item.steps || []).join(", "))} · ${esc(item.evidence)}</small>`).join("")}</div>` : "").join("")}</section>`;
+      items?.length ? `<div class="finding"><h3>${label}</h3>${items.map((item) => `<p class="spacer">${esc(item.comment)}</p><small>${item.classification === "ux_hypothesis" ? "Hypothesis — developer review required" : "Historical assertion — unverified"}. Quotation is contextual support only.<br>Steps ${esc((item.steps || []).join(", "))} · ${esc(item.evidence)}</small>`).join("")}</div>` : "").join("")}</section>`;
 }
 
 function scope(r) {
@@ -76,13 +105,11 @@ const elapsed = (value) => typeof value === "number" && Number.isFinite(value) &
 
 function experienceSummary(r) {
   if (!exploration(r)) return "";
-  const summary = r.experience_summary;
   const trace = r.journey_summary;
-  return `<section class="experience-summary"><div class="sectionhead"><h2>Persona experience</h2><span class="badge">${summary ? "AI interpretation" : "Recorded journey"}</span></div>
-    <p>${esc(summary?.comment || trace?.text || "No execution summary is available for this report.")}</p>
-    ${summary ? `<small>Based on steps ${esc(summary.steps.join(", "))}. References are checked; the interpretation still needs human review.</small>` : ""}
+  return `<section class="experience-summary"><div class="sectionhead"><h2>Task outcome and recorded journey</h2><span class="badge">Recorded evidence</span></div>
     ${r.evidence_incomplete ? '<p class="hint warning">Incomplete evidence: inspect the action journal and missing captures in Journey evidence.</p>' : ""}
     <div class="journey-outcome"><div><small>Task outcome</small><h3>${esc(trace?.outcome || "Completion not verified")}</h3></div><div><small>Session ending</small><p>${esc(trace?.stop_reason || r.stop_reason || "Not recorded")}</p></div></div>
+    <p class="spacer">${esc(trace?.text || "No execution summary is available for this report.")}</p>
     ${r.outcome_verification ? `<details class="hint spacer"><summary>Independent endpoint verification</summary><p>${esc(r.outcome_verification.reason)}</p><p>Execution: ${esc(r.execution_status || "Not recorded")}</p>${(r.outcome_verification.evidence || []).map(e => `<div id="verification-${esc(e.id)}"><small>Evidence ${esc(e.id)} · ${esc(e.at)} · ${e.step ? `step ${esc(e.step)}` : "endpoint inspection"}</small><pre>${esc(JSON.stringify({conditions: e.conditions, observed: e.observed}, null, 2))}</pre></div>`).join("")}${(r.outcome_verification.limitations || []).map(x => `<p>${esc(x)}</p>`).join("")}</details>` : ""}</section>`;
 }
 
@@ -109,7 +136,7 @@ function evidence(r) {
         <small>Action status: ${esc(row.action_status || "Legacy — dispatch not recorded")} · Dispatch: ${esc(row.dispatch_state || "Not recorded")}</small>
         ${row.evidence_gaps?.length ? `<div class="hint warning spacer"><strong>Incomplete evidence</strong>${row.evidence_gaps.map(g => `<p>${esc(g)}</p>`).join("")}</div>` : ""}
         ${row.reason ? `<p class="muted spacer"><strong>Agent's stated intention:</strong> ${esc(row.reason)}</p>` : ""}
-        ${issues.length ? `<div class="hint spacer"><strong>Associated candidate issues</strong>${issues.map(f => `<p>OM-${f.number} · ${esc(f.issue)} <span class="badge">${esc(f.severity)}</span></p>`).join("")}</div>` : ""}
+        ${issues.length ? `<div class="hint spacer"><strong>Associated candidate issues</strong>${issues.map(f => `<p>OM-${f.number} · ${esc(f.issue)} <span class="badge">${f.classification === "ux_hypothesis" ? "Hypothesis — unverified" : "Historical assertion — unverified"}</span></p>`).join("")}</div>` : ""}
         ${captures}</article>`;
     }).join("")}</div>`;
 }
@@ -133,7 +160,7 @@ export function report() {
   return steps(3) + heading(exploration(r) ? "Exploration report" : r.task || "Evaluation report", `${r.persona} · ${r.method || "Screenshot UX evaluation"}`, btn("↓ Export report JSON", "export-report", "ghost")) + `
     <div class="hint">${intro}</div><div class="grid cols4 spacer">${metrics.map(([label, count]) => `<div class="panel stat"><small>${label}</small><strong>${esc(count)}</strong></div>`).join("")}</div>
     <div class="tabs spacer">${(exploration(r) ? [["Experience & findings", "Overview"], ["Journey evidence", "Evidence"]] : [["Overview", "Overview"], ["Review cases", "Review cases"], ["Evidence", "Evidence"]]).map(([label, key]) => btn(label, "report-tab", key === state.reportTab ? "primary" : "ghost", key)).join("")}</div>
-    <div class="deck"><section class="panel">${state.reportTab === "Overview" ? `${experienceSummary(r)}${feedback(r)}<h2 class="spacer">Problems encountered</h2>${findings(r)}${recommendations(r)}` : state.reportTab === "Review cases" ? scope(r) : evidence(r)}
+    <div class="deck"><section class="panel">${state.reportTab === "Overview" ? `${experienceSummary(r)}${claimDetails(r)}<h2 class="spacer">${exploration(r) ? "Potential UX issues" : "Model observations"}</h2>${findings(r)}${recommendations(r)}${feedback(r)}${unsupportedClaims(r)}` : state.reportTab === "Review cases" ? scope(r) : evidence(r)}
     ${r.limitations?.length ? `<details class="hint spacer"><summary>Recorded limitations</summary>${r.limitations.map((v) => `<p>${esc(v)}</p>`).join("")}</details>` : ""}</section>
     <aside class="panel" style="align-self:start"><div class="eyebrow">Persona overview</div><h3>${esc(r.persona)}</h3>
       ${[["Goal", r.task || "Not recorded"], ["Technical familiarity", r.persona_snapshot?.technical_skill || r.persona_snapshot?.technical_level || "Not recorded"], ["URL", r.url || "Not recorded"], ["Mode", exploration(r) ? "Browser exploration" : "Screenshot UX"], ["Review", exploration(r) ? reviewLabel(r.review_status) : "Screenshot analysis"], ["Project", project?.name || "Ungrouped"], ["Model", r.model || "Not recorded"], ["Run date", r.imported ? "Not recorded" : date(r.created_at)]].map(([label, value]) => `<div class="listrow"><small>${label}</small><span class="context-value">${esc(value)}</span></div>`).join("")}
